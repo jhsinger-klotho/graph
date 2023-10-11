@@ -2,125 +2,53 @@ package graph
 
 import "testing"
 
-func TestDirected(t *testing.T) {
+func TestTraits(t *testing.T) {
 	tests := map[string]struct {
+		f        func(*Traits)
 		expected *Traits
 	}{
 		"directed graph": {
+			f: Directed(),
 			expected: &Traits{
 				IsDirected: true,
 			},
 		},
-	}
-
-	for name, test := range tests {
-		p := &Traits{}
-
-		Directed()(p)
-
-		if !traitsAreEqual(test.expected, p) {
-			t.Errorf("%s: trait expectation doesn't match: expected %v, got %v", name, test.expected, p)
-		}
-	}
-}
-
-func TestAcyclic(t *testing.T) {
-	tests := map[string]struct {
-		expected *Traits
-	}{
 		"acyclic graph": {
+			f: Acyclic(),
 			expected: &Traits{
 				IsAcyclic: true,
 			},
 		},
-	}
-
-	for name, test := range tests {
-		p := &Traits{}
-
-		Acyclic()(p)
-
-		if !traitsAreEqual(test.expected, p) {
-			t.Errorf("%s: trait expectation doesn't match: expected %v, got %v", name, test.expected, p)
-		}
-	}
-}
-
-func TestWeighted(t *testing.T) {
-	tests := map[string]struct {
-		expected *Traits
-	}{
 		"weighted graph": {
+			f: Weighted(),
 			expected: &Traits{
 				IsWeighted: true,
 			},
 		},
-	}
-
-	for name, test := range tests {
-		p := &Traits{}
-
-		Weighted()(p)
-
-		if !traitsAreEqual(test.expected, p) {
-			t.Errorf("%s: trait expectation doesn't match: expected %v, got %v", name, test.expected, p)
-		}
-	}
-}
-
-func TestRooted(t *testing.T) {
-	tests := map[string]struct {
-		expected *Traits
-	}{
 		"rooted graph": {
+			f: Rooted(),
 			expected: &Traits{
 				IsRooted: true,
 			},
 		},
-	}
-
-	for name, test := range tests {
-		p := &Traits{}
-
-		Rooted()(p)
-
-		if !traitsAreEqual(test.expected, p) {
-			t.Errorf("%s: trait expectation doesn't match: expected %v, got %v", name, test.expected, p)
-		}
-	}
-}
-
-func TestTree(t *testing.T) {
-	tests := map[string]struct {
-		expected *Traits
-	}{
 		"tree graph": {
+			f: Tree(),
 			expected: &Traits{
 				IsAcyclic: true,
 				IsRooted:  true,
 			},
 		},
-	}
-
-	for name, test := range tests {
-		p := &Traits{}
-
-		Tree()(p)
-
-		if !traitsAreEqual(test.expected, p) {
-			t.Errorf("%s: trait expectation doesn't match: expected %v, got %v", name, test.expected, p)
-		}
-	}
-}
-
-func TestPreventCycles(t *testing.T) {
-	tests := map[string]struct {
-		expected *Traits
-	}{
 		"prevent cycles": {
+			f: PreventCycles(),
 			expected: &Traits{
 				IsAcyclic:     true,
 				PreventCycles: true,
+			},
+		},
+		"allow duplicate add": {
+			f: AllowDuplicateAdd(),
+			expected: &Traits{
+				AllowDuplicateAdd: true,
 			},
 		},
 	}
@@ -128,7 +56,7 @@ func TestPreventCycles(t *testing.T) {
 	for name, test := range tests {
 		p := &Traits{}
 
-		PreventCycles()(p)
+		test.f(p)
 
 		if !traitsAreEqual(test.expected, p) {
 			t.Errorf("%s: trait expectation doesn't match: expected %v, got %v", name, test.expected, p)

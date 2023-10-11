@@ -32,6 +32,7 @@ func TestDirected_Traits(t *testing.T) {
 
 func TestDirected_AddVertex(t *testing.T) {
 	tests := map[string]struct {
+		traits             Traits
 		vertices           []int
 		properties         *VertexProperties
 		expectedVertices   []int
@@ -57,10 +58,15 @@ func TestDirected_AddVertex(t *testing.T) {
 			expectedVertices:     []int{1, 2},
 			finallyExpectedError: ErrVertexAlreadyExists,
 		},
+		"graph with duplicated vertex allowed": {
+			traits:           Traits{AllowDuplicateAdd: true},
+			vertices:         []int{1, 2, 2},
+			expectedVertices: []int{1, 2},
+		},
 	}
 
 	for name, test := range tests {
-		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
+		graph := newDirected(IntHash, &test.traits, newMemoryStore[int, int]())
 
 		var err error
 
@@ -353,6 +359,16 @@ func TestDirected_AddEdge(t *testing.T) {
 			},
 			traits:               &Traits{},
 			finallyExpectedError: ErrEdgeAlreadyExists,
+		},
+		"edge already exists allowed": {
+			vertices: []int{1, 2, 3},
+			edges: []Edge[int]{
+				{Source: 1, Target: 2},
+				{Source: 2, Target: 3},
+				{Source: 3, Target: 1},
+				{Source: 3, Target: 1},
+			},
+			traits: &Traits{AllowDuplicateAdd: true},
 		},
 		"edge with attributes": {
 			vertices: []int{1, 2},
@@ -909,7 +925,7 @@ func TestDirected_RemoveEdge(t *testing.T) {
 			}
 			// After removing the edge, verify that it can't be retrieved using
 			// Edge anymore.
-			if _, err := graph.Edge(removeEdge.Source, removeEdge.Target); err != ErrEdgeNotFound {
+			if _, err := graph.Edge(removeEdge.Source, removeEdge.Target); !errors.Is(err, ErrEdgeNotFound) {
 				t.Fatalf("%s: error expectancy doesn't match: expected %v, got %v", name, ErrEdgeNotFound, err)
 			}
 		}
@@ -1267,6 +1283,8 @@ func TestDirected_addEdge(t *testing.T) {
 		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
 
 		for _, edge := range test.edges {
+			_ = graph.AddVertex(edge.Source)
+			_ = graph.AddVertex(edge.Target)
 			sourceHash := graph.hash(edge.Source)
 			TargetHash := graph.hash(edge.Target)
 			err := graph.addEdge(sourceHash, TargetHash, edge)

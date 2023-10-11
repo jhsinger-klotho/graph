@@ -35,7 +35,11 @@ func (u *undirected[K, T]) AddVertex(value T, options ...func(*VertexProperties)
 		option(&prop)
 	}
 
-	return u.store.AddVertex(hash, value, prop)
+	err := u.store.AddVertex(hash, value, prop)
+	if u.traits.AllowDuplicateAdd && errors.Is(err, ErrVertexAlreadyExists) {
+		return nil
+	}
+	return err
 }
 
 func (u *undirected[K, T]) Vertex(hash K) (T, error) {
@@ -57,19 +61,6 @@ func (u *undirected[K, T]) RemoveVertex(hash K) error {
 }
 
 func (u *undirected[K, T]) AddEdge(sourceHash, targetHash K, options ...func(*EdgeProperties)) error {
-	if _, _, err := u.store.Vertex(sourceHash); err != nil {
-		return fmt.Errorf("could not find source vertex with hash %v: %w", sourceHash, err)
-	}
-
-	if _, _, err := u.store.Vertex(targetHash); err != nil {
-		return fmt.Errorf("could not find target vertex with hash %v: %w", targetHash, err)
-	}
-
-	//nolint:govet // False positive.
-	if _, err := u.Edge(sourceHash, targetHash); !errors.Is(err, ErrEdgeNotFound) {
-		return ErrEdgeAlreadyExists
-	}
-
 	// If the user opted in to preventing cycles, run a cycle check.
 	if u.traits.PreventCycles {
 		createsCycle, err := CreatesCycle[K, T](u, sourceHash, targetHash)
@@ -347,7 +338,9 @@ func (u *undirected[K, T]) edgesAreEqual(a, b Edge[T]) bool {
 func (u *undirected[K, T]) addEdge(sourceHash, targetHash K, edge Edge[K]) error {
 	err := u.store.AddEdge(sourceHash, targetHash, edge)
 	if err != nil {
-		return err
+		if !u.traits.AllowDuplicateAdd || !errors.Is(err, ErrEdgeAlreadyExists) {
+			return err
+		}
 	}
 
 	rEdge := Edge[K]{
@@ -361,9 +354,9 @@ func (u *undirected[K, T]) addEdge(sourceHash, targetHash K, edge Edge[K]) error
 	}
 
 	err = u.store.AddEdge(targetHash, sourceHash, rEdge)
-	if err != nil {
-		return err
+	if u.traits.AllowDuplicateAdd && errors.Is(err, ErrEdgeAlreadyExists) {
+		return nil
 	}
 
-	return nil
+	return err
 }

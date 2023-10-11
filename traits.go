@@ -8,11 +8,12 @@ package graph
 //
 // This will set the IsDirected field to true.
 type Traits struct {
-	IsDirected    bool
-	IsAcyclic     bool
-	IsWeighted    bool
-	IsRooted      bool
-	PreventCycles bool
+	IsDirected        bool
+	IsAcyclic         bool
+	IsWeighted        bool
+	IsRooted          bool
+	PreventCycles     bool
+	AllowDuplicateAdd bool
 }
 
 // Directed creates a directed graph. This has implications on graph traversal and the order of
@@ -59,5 +60,11 @@ func PreventCycles() func(*Traits) {
 	return func(t *Traits) {
 		Acyclic()(t)
 		t.PreventCycles = true
+	}
+}
+
+func AllowDuplicateAdd() func(*Traits) {
+	return func(t *Traits) {
+		t.AllowDuplicateAdd = true
 	}
 }

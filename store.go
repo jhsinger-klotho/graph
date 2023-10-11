@@ -170,6 +170,14 @@ func (s *memoryStore[K, T]) AddEdge(sourceHash, targetHash K, edge Edge[K]) erro
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	if _, _, err := s.vertexWithLock(sourceHash); err != nil {
+		return err
+	}
+
+	if _, _, err := s.vertexWithLock(targetHash); err != nil {
+		return err
+	}
+
 	if _, ok := s.outEdges[sourceHash]; !ok {
 		s.outEdges[sourceHash] = make(map[K]Edge[K])
 	}

@@ -34,7 +34,11 @@ func (d *directed[K, T]) AddVertex(value T, options ...func(*VertexProperties)) 
 		option(&properties)
 	}
 
-	return d.store.AddVertex(hash, value, properties)
+	err := d.store.AddVertex(hash, value, properties)
+	if d.traits.AllowDuplicateAdd && errors.Is(err, ErrVertexAlreadyExists) {
+		return nil
+	}
+	return err
 }
 
 func (d *directed[K, T]) AddVerticesFrom(g Graph[K, T]) error {
@@ -76,20 +80,6 @@ func (d *directed[K, T]) RemoveVertex(hash K) error {
 }
 
 func (d *directed[K, T]) AddEdge(sourceHash, targetHash K, options ...func(*EdgeProperties)) error {
-	_, _, err := d.store.Vertex(sourceHash)
-	if err != nil {
-		return fmt.Errorf("source vertex %v: %w", sourceHash, err)
-	}
-
-	_, _, err = d.store.Vertex(targetHash)
-	if err != nil {
-		return fmt.Errorf("target vertex %v: %w", targetHash, err)
-	}
-
-	if _, err := d.Edge(sourceHash, targetHash); !errors.Is(err, ErrEdgeNotFound) {
-		return ErrEdgeAlreadyExists
-	}
-
 	// If the user opted in to preventing cycles, run a cycle check.
 	if d.traits.PreventCycles {
 		createsCycle, err := d.createsCycle(sourceHash, targetHash)
@@ -239,7 +229,11 @@ func (d *directed[K, T]) PredecessorMap() (map[K]map[K]Edge[K], error) {
 }
 
 func (d *directed[K, T]) addEdge(sourceHash, targetHash K, edge Edge[K]) error {
-	return d.store.AddEdge(sourceHash, targetHash, edge)
+	err := d.store.AddEdge(sourceHash, targetHash, edge)
+	if d.traits.AllowDuplicateAdd && errors.Is(err, ErrEdgeAlreadyExists) {
+		return nil
+	}
+	return err
 }
 
 func (d *directed[K, T]) Clone() (Graph[K, T], error) {

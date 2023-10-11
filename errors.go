@@ -38,11 +38,11 @@ func (e *VertexNotFoundError[K]) Error() string {
 }
 
 func (e *EdgeAlreadyExistsError[K]) Error() string {
-	return fmt.Sprintf("edge %v - %v already exists", e.Source, e.Target)
+	return fmt.Sprintf("edge (%v, %v) already exists", e.Source, e.Target)
 }
 
 func (e *EdgeNotFoundError[K]) Error() string {
-	return fmt.Sprintf("edge %v - %v not found", e.Source, e.Target)
+	return fmt.Sprintf("edge (%v, %v) not found", e.Source, e.Target)
 }
 
 func (e *VertexHasEdges[K]) Error() string {
