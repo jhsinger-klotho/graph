@@ -57,7 +57,8 @@ type Graph[K comparable, T any] interface {
 	Traits() *Traits
 
 	// AddVertex creates a new vertex in the graph. If the vertex already exists
-	// in the graph, ErrVertexAlreadyExists will be returned.
+	// in the graph, ErrVertexAlreadyExists will be returned unless
+	// AllowDuplicateAdd is enabled.
 	//
 	// AddVertex accepts a variety of functional options to set further edge
 	// details such as the weight or an attribute:
@@ -70,7 +71,8 @@ type Graph[K comparable, T any] interface {
 	// given graph to the receiving graph.
 	//
 	// All vertices will be added until an error occurs. If one of the vertices
-	// already exists, ErrVertexAlreadyExists will be returned.
+	// already exists, ErrVertexAlreadyExists will be returned unless
+	// AllowDuplicateAdd is enabled.
 	AddVerticesFrom(g Graph[K, T]) error
 
 	// Vertex returns the vertex with the given hash or ErrVertexNotFound if it
@@ -91,9 +93,10 @@ type Graph[K comparable, T any] interface {
 	// AddEdge creates an edge between the source and the target vertex.
 	//
 	// If either vertex cannot be found, ErrVertexNotFound will be returned. If
-	// the edge already exists, ErrEdgeAlreadyExists will be returned. If cycle
-	// prevention has been activated using PreventCycles and if adding the edge
-	// would create a cycle, ErrEdgeCreatesCycle will be returned.
+	// the edge already exists, ErrEdgeAlreadyExists will be returned unless
+	// AllowDuplicateAdd is enabled. If cycle prevention has been activated
+	// using PreventCycles and if adding the edge would create a cycle,
+	// ErrEdgeCreatesCycle will be returned.
 	//
 	// AddEdge accepts functional options to set further edge properties such as
 	// the weight or an attribute:
