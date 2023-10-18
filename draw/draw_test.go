@@ -15,7 +15,7 @@ func TestGenerateDOT(t *testing.T) {
 		vertices         []string
 		vertexProperties map[string]graph.VertexProperties
 		edges            []graph.Edge[string]
-		expected         description
+		expected         Description
 	}{
 		"3-vertex directed graph": {
 			graph:      graph.New(graph.StringHash, graph.Directed()),
@@ -25,11 +25,11 @@ func TestGenerateDOT(t *testing.T) {
 				{Source: "1", Target: "2"},
 				{Source: "1", Target: "3"},
 			},
-			expected: description{
+			expected: Description{
 				GraphType:    "digraph",
 				Attributes:   map[string]string{},
 				EdgeOperator: "->",
-				Statements: []statement{
+				Statements: []Statement{
 					{Source: "1", Target: "2"},
 					{Source: "1", Target: "3"},
 					{Source: "1"},
@@ -55,11 +55,11 @@ func TestGenerateDOT(t *testing.T) {
 				},
 				{Source: "1", Target: "3"},
 			},
-			expected: description{
+			expected: Description{
 				GraphType:    "digraph",
 				Attributes:   map[string]string{},
 				EdgeOperator: "->",
-				Statements: []statement{
+				Statements: []Statement{
 					{
 						Source:     "1",
 						Target:     "2",
@@ -96,11 +96,11 @@ func TestGenerateDOT(t *testing.T) {
 			edges: []graph.Edge[string]{
 				{Source: "1", Target: "2"},
 			},
-			expected: description{
+			expected: Description{
 				GraphType:    "digraph",
 				Attributes:   map[string]string{},
 				EdgeOperator: "->",
-				Statements: []statement{
+				Statements: []Statement{
 					{
 						Source: "1",
 						SourceAttributes: map[string]string{
@@ -133,7 +133,7 @@ func TestGenerateDOT(t *testing.T) {
 			edges: []graph.Edge[string]{
 				{Source: "1", Target: "2"},
 			},
-			expected: description{
+			expected: Description{
 				GraphType: "digraph",
 				Attributes: map[string]string{
 					"label":     "my-graph",
@@ -141,7 +141,7 @@ func TestGenerateDOT(t *testing.T) {
 					"compound":  "false",
 				},
 				EdgeOperator: "->",
-				Statements: []statement{
+				Statements: []Statement{
 					{
 						Source: "1",
 					},
@@ -219,15 +219,15 @@ func TestGenerateDOT(t *testing.T) {
 
 func TestRenderDOT(t *testing.T) {
 	tests := map[string]struct {
-		description description
+		description Description
 		expected    string
 	}{
 		"3-vertex directed graph": {
-			description: description{
+			description: Description{
 				GraphType:    "digraph",
 				Attributes:   map[string]string{},
 				EdgeOperator: "->",
-				Statements: []statement{
+				Statements: []Statement{
 					{Source: 1, Target: 2},
 					{Source: 1, Target: 3},
 					{Source: 1},
@@ -244,11 +244,11 @@ func TestRenderDOT(t *testing.T) {
 			}`,
 		},
 		"custom edge attributes": {
-			description: description{
+			description: Description{
 				GraphType:    "digraph",
 				Attributes:   map[string]string{},
 				EdgeOperator: "->",
-				Statements: []statement{
+				Statements: []Statement{
 					{
 						Source: 1,
 						Target: 2,
@@ -277,11 +277,11 @@ func TestRenderDOT(t *testing.T) {
 			}`,
 		},
 		"vertices containing special characters": {
-			description: description{
+			description: Description{
 				GraphType:    "digraph",
 				Attributes:   map[string]string{},
 				EdgeOperator: "->",
-				Statements: []statement{
+				Statements: []Statement{
 					{Source: "/home", Target: "projects/graph"},
 					{Source: "/home", Target: ".config"},
 					{Source: ".config", Target: "my file.txt"},
@@ -294,11 +294,11 @@ func TestRenderDOT(t *testing.T) {
 			}`,
 		},
 		"vertices with attributes": {
-			description: description{
+			description: Description{
 				GraphType:    "digraph",
 				Attributes:   map[string]string{},
 				EdgeOperator: "->",
-				Statements: []statement{
+				Statements: []Statement{
 					{
 						Source: "1",
 						SourceAttributes: map[string]string{
@@ -326,13 +326,13 @@ func TestRenderDOT(t *testing.T) {
 			}`,
 		},
 		"3-vertex directed graph with attributes": {
-			description: description{
+			description: Description{
 				GraphType: "digraph",
 				Attributes: map[string]string{
 					"label": "my-graph",
 				},
 				EdgeOperator: "->",
-				Statements: []statement{
+				Statements: []Statement{
 					{Source: 1, Target: 2},
 					{Source: 1, Target: 3},
 					{Source: 1},
@@ -367,11 +367,11 @@ func TestRenderDOT(t *testing.T) {
 func TestGraphAttribute(t *testing.T) {
 	tests := map[string]struct {
 		attribute [2]string
-		expected  *description
+		expected  *Description
 	}{
 		"label attribute": {
 			attribute: [2]string{"label", "my-graph"},
-			expected: &description{
+			expected: &Description{
 				Attributes: map[string]string{
 					"label": "my-graph",
 				},
@@ -380,7 +380,7 @@ func TestGraphAttribute(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		d := &description{
+		d := &Description{
 			Attributes: make(map[string]string),
 		}
 
@@ -441,7 +441,7 @@ func normalizeOutput(output string) string {
 	return replacer.Replace(output)
 }
 
-func statementsAreEqual(a, b statement) bool {
+func statementsAreEqual(a, b Statement) bool {
 	if len(a.EdgeAttributes) != len(b.EdgeAttributes) {
 		return false
 	}

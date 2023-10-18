@@ -13,23 +13,27 @@ import (
 
 // ToDo: This template should be simplified and split into multiple templates.
 const dotTemplate = `strict {{.GraphType}} {
-{{range $k, $v := .Attributes}}
+{{range $k, $v := .Attributes -}}
 	{{$k}}="{{$v}}";
-{{end}}
-{{range $s := .Statements}}
+{{- end}}
+{{- range $s := .Statements}}
 	"{{.Source}}" {{if .Target}}{{$.EdgeOperator}} "{{.Target}}" [ {{range $k, $v := .EdgeAttributes}}{{$k}}="{{$v}}", {{end}} weight={{.EdgeWeight}} ]{{else}}[ {{range $k, $v := .SourceAttributes}}{{$k}}="{{$v}}", {{end}} weight={{.SourceWeight}} ]{{end}};
-{{end}}
+{{- end}}
+{{- range $s := .ExtraStatements}}
+	{{$s}}
+{{- end}}
 }
 `
 
-type description struct {
-	GraphType    string
-	Attributes   map[string]string
-	EdgeOperator string
-	Statements   []statement
+type Description struct {
+	GraphType       string
+	Attributes      map[string]string
+	EdgeOperator    string
+	Statements      []Statement
+	ExtraStatements []string
 }
 
-type statement struct {
+type Statement struct {
 	Source           interface{}
 	Target           interface{}
 	SourceWeight     int
@@ -70,7 +74,7 @@ type statement struct {
 // add global attributes when rendering the graph:
 //
 //	_ = draw.DOT(g, file, draw.GraphAttribute("label", "my-graph"))
-func DOT[K comparable, T any](g graph.Graph[K, T], w io.Writer, options ...func(*description)) error {
+func DOT[K comparable, T any](g graph.Graph[K, T], w io.Writer, options ...func(*Description)) error {
 	desc, err := generateDOT(g, options...)
 	if err != nil {
 		return fmt.Errorf("failed to generate DOT description: %w", err)
@@ -80,18 +84,18 @@ func DOT[K comparable, T any](g graph.Graph[K, T], w io.Writer, options ...func(
 }
 
 // GraphAttribute is a functional option for the [DOT] method.
-func GraphAttribute(key, value string) func(*description) {
-	return func(d *description) {
+func GraphAttribute(key, value string) func(*Description) {
+	return func(d *Description) {
 		d.Attributes[key] = value
 	}
 }
 
-func generateDOT[K comparable, T any](g graph.Graph[K, T], options ...func(*description)) (description, error) {
-	desc := description{
+func generateDOT[K comparable, T any](g graph.Graph[K, T], options ...func(*Description)) (Description, error) {
+	desc := Description{
 		GraphType:    "graph",
 		Attributes:   make(map[string]string),
 		EdgeOperator: "--",
-		Statements:   make([]statement, 0),
+		Statements:   make([]Statement, 0),
 	}
 
 	for _, option := range options {
@@ -114,7 +118,7 @@ func generateDOT[K comparable, T any](g graph.Graph[K, T], options ...func(*desc
 			return desc, err
 		}
 
-		stmt := statement{
+		stmt := Statement{
 			Source:           vertex,
 			SourceWeight:     sourceProperties.Weight,
 			SourceAttributes: sourceProperties.Attributes,
@@ -122,7 +126,7 @@ func generateDOT[K comparable, T any](g graph.Graph[K, T], options ...func(*desc
 		desc.Statements = append(desc.Statements, stmt)
 
 		for adjacency, edge := range adjacencies {
-			stmt := statement{
+			stmt := Statement{
 				Source:         vertex,
 				Target:         adjacency,
 				EdgeWeight:     edge.Properties.Weight,
@@ -135,7 +139,7 @@ func generateDOT[K comparable, T any](g graph.Graph[K, T], options ...func(*desc
 	return desc, nil
 }
 
-func renderDOT(w io.Writer, d description) error {
+func renderDOT(w io.Writer, d Description) error {
 	tpl, err := template.New("dotTemplate").Parse(dotTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %w", err)
