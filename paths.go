@@ -323,7 +323,7 @@ func AllPathsBetween[K comparable, T any](g Graph[K, T], start, end K) ([][]K, e
 					contains = true
 				}
 			})
-			if contains {
+			if contains && e != end {
 				continue
 			}
 			newElements.push(e)
@@ -371,7 +371,7 @@ func AllPathsBetween[K comparable, T any](g Graph[K, T], start, end K) ([][]K, e
 		adjs, _ := viceStack.top()
 
 		if adjs.isEmpty() {
-			if v == end {
+			if v == end && len(mainStack.elements) > 1 {
 				path := make([]K, 0)
 				mainStack.forEach(func(k K) {
 					path = append(path, k)

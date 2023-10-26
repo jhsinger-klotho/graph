@@ -735,6 +735,30 @@ func TestAllPathsBetween(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "directed with cycle",
+			args: args[int, int]{
+				g: func() Graph[int, int] {
+					g := New(IntHash, Directed())
+					for i := 0; i <= 8; i++ {
+						_ = g.AddVertex(i)
+					}
+					_ = g.AddEdge(0, 1)
+					_ = g.AddEdge(1, 2)
+					_ = g.AddEdge(2, 3)
+					_ = g.AddEdge(2, 0)
+					_ = g.AddEdge(3, 0)
+					return g
+				}(),
+				start: 0,
+				end:   0,
+			},
+			want: [][]int{
+				{0, 1, 2, 3, 0},
+				{0, 1, 2, 0},
+			},
+			wantErr: false,
+		},
+		{
 			name: "undirected",
 			args: args[int, int]{
 				g: func() Graph[int, int] {
