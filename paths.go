@@ -323,7 +323,7 @@ func AllPathsBetween[K comparable, T any](g Graph[K, T], start, end K) ([][]K, e
 					contains = true
 				}
 			})
-			if contains && e != end {
+			if contains && (e != start || e != end) {
 				continue
 			}
 			newElements.push(e)
