@@ -22,26 +22,23 @@ func TopologicalSort[K comparable, T any](g Graph[K, T]) ([]K, error) {
 		return nil, fmt.Errorf("topological sort cannot be computed on undirected graph")
 	}
 
-	gOrder, err := g.Order()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get graph order: %w", err)
-	}
-
 	predecessorMap, err := g.PredecessorMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get predecessor map: %w", err)
 	}
 
-	queue := make([]K, 0)
+	queue := make([]K, 0, len(predecessorMap))
+	queued := make(map[K]struct{})
 
 	for vertex, predecessors := range predecessorMap {
 		if len(predecessors) == 0 {
 			queue = append(queue, vertex)
+			queued[vertex] = struct{}{}
 		}
 	}
 
-	order := make([]K, 0, gOrder)
-	visited := make(map[K]struct{}, gOrder)
+	order := make([]K, 0, len(predecessorMap))
+	visited := make(map[K]struct{}, len(predecessorMap))
 
 	for len(queue) > 0 {
 		currentVertex := queue[0]
@@ -58,12 +55,14 @@ func TopologicalSort[K comparable, T any](g Graph[K, T]) ([]K, error) {
 			delete(predecessors, currentVertex)
 
 			if len(predecessors) == 0 {
-				queue = append(queue, vertex)
+				if _, ok := queued[vertex]; !ok {
+					queue = append(queue, vertex)
+				}
 			}
 		}
 	}
 
-	if len(order) != gOrder {
+	if len(order) != len(predecessorMap) {
 		return nil, errors.New("topological sort cannot be computed on graph with cycles")
 	}
 
@@ -83,8 +82,8 @@ func StableTopologicalSort[K comparable, T any](g Graph[K, T], less func(K, K) b
 		return nil, fmt.Errorf("failed to get predecessor map: %w", err)
 	}
 
-	queue := make([]K, 0)
-	queued := make(map[K]struct{})
+	queue := make([]K, 0, len(predecessorMap))
+	queued := make(map[K]struct{}, len(predecessorMap))
 
 	for vertex, predecessors := range predecessorMap {
 		if len(predecessors) == 0 {
