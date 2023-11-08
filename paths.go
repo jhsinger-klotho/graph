@@ -300,9 +300,21 @@ func AllPathsBetween[K comparable, T any](g Graph[K, T], start, end K) ([][]K, e
 		return nil, err
 	}
 
+	// Use a pool to save on allocations
+	var oldStacks []*stack[K]
+	newStack := func() *stack[K] {
+		if len(oldStacks) == 0 {
+			return newStack[K]()
+		}
+		s := oldStacks[len(oldStacks)-1]
+		oldStacks = oldStacks[:len(oldStacks)-1]
+		s.clear()
+		return s
+	}
+
 	// The algorithm used relies on stacks instead of recursion. It is described
 	// here: https://boycgit.github.io/all-paths-between-two-vertex/
-	mainStack := newStack[K]()
+	mainStack := newStack()
 	viceStack := newStackOfStacks[K]()
 
 	checkEmpty := func() error {
@@ -314,16 +326,10 @@ func AllPathsBetween[K comparable, T any](g Graph[K, T], start, end K) ([][]K, e
 
 	buildLayer := func(element K) {
 		mainStack.push(element)
-		newElements := newStack[K]()
+		newElements := newStack()
 
 		for e := range adjacencyMap[element] {
-			var contains bool
-			mainStack.forEach(func(k K) {
-				if e == k {
-					contains = true
-				}
-			})
-			if contains && (e != start || e != end) {
+			if mainStack.contains(e) && (e != start || e != end) {
 				continue
 			}
 			newElements.push(e)
@@ -357,7 +363,8 @@ func AllPathsBetween[K comparable, T any](g Graph[K, T], start, end K) ([][]K, e
 		}
 
 		_, _ = mainStack.pop()
-		_, _ = viceStack.pop()
+		s, _ := viceStack.pop()
+		oldStacks = append(oldStacks, s)
 
 		return nil
 	}
