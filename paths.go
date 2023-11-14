@@ -329,7 +329,15 @@ func AllPathsBetween[K comparable, T any](g Graph[K, T], start, end K) ([][]K, e
 		newElements := newStack()
 
 		for e := range adjacencyMap[element] {
-			if mainStack.contains(e) && (e != start || e != end) {
+			var contains bool
+			var containsCount int
+			mainStack.forEach(func(k K) {
+				if e == k {
+					contains = true
+					containsCount++
+				}
+			})
+			if contains && (e != start || e != end) || containsCount > 1 {
 				continue
 			}
 			newElements.push(e)
