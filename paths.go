@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 )
 
 var ErrTargetNotReachable = errors.New("target vertex not reachable from source")
@@ -68,9 +69,16 @@ func CreatesCycle[K comparable, T any](g Graph[K, T], source, target K) (bool, e
 // ShortestPath has a time complexity of O(|V|+|E|log(|V|)).
 func ShortestPath[K comparable, T any](g Graph[K, T], source, target K) ([]K, error) {
 	if g.Traits().IsDirected {
-		return bellmanFord(g, source, target)
+		return bellmanFord(g, source, target, nil)
 	}
 	return dijkstra(g, source, target)
+}
+
+func ShortestPathStable[K comparable, T any](g Graph[K, T], source, target K, less func(a, b K) bool) ([]K, error) {
+	if g.Traits().IsDirected {
+		return bellmanFord(g, source, target, less)
+	}
+	return nil, errors.New("ShortestPathStable only currently supported for directed graphs")
 }
 
 func dijkstra[K comparable, T any](g Graph[K, T], source, target K) ([]K, error) {
@@ -148,7 +156,7 @@ func dijkstra[K comparable, T any](g Graph[K, T], source, target K) ([]K, error)
 //
 // The returned path includes the source and target vertices. If the target cannot be reached
 // from the source vertex, ErrTargetNotReachable will be returned. If there are multiple shortest
-func bellmanFord[K comparable, T any](g Graph[K, T], source, target K) ([]K, error) {
+func bellmanFord[K comparable, T any](g Graph[K, T], source, target K, less func(a, b K) bool) ([]K, error) {
 
 	if !g.Traits().IsDirected {
 		return nil, errors.New("Bellman-Ford algorithm can only be used on directed graphs")
@@ -161,13 +169,21 @@ func bellmanFord[K comparable, T any](g Graph[K, T], source, target K) ([]K, err
 	if err != nil {
 		return nil, fmt.Errorf("could not get adjacency map: %w", err)
 	}
+	keys := make([]K, 0, len(adjacencyMap))
 	for key := range adjacencyMap {
 		dist[key] = math.MaxInt32
+		keys = append(keys, key)
 	}
 	dist[source] = 0
+	if less != nil {
+		sort.Slice(keys, func(i, j int) bool {
+			return less(keys[i], keys[j])
+		})
+	}
 
 	for i := 0; i < len(adjacencyMap)-1; i++ {
-		for key, edges := range adjacencyMap {
+		for _, key := range keys {
+			edges := adjacencyMap[key]
 			for _, edge := range edges {
 				if newDist := dist[key] + edge.Properties.Weight; newDist < dist[edge.Target] {
 					dist[edge.Target] = newDist

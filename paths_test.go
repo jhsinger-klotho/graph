@@ -586,7 +586,7 @@ func Test_BellmanFord(t *testing.T) {
 			}
 		}
 
-		shortestPath, err := bellmanFord(graph, test.sourceHash, test.targetHash)
+		shortestPath, err := bellmanFord(graph, test.sourceHash, test.targetHash, nil)
 
 		if test.shouldFail != (err != nil) {
 			t.Fatalf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, (err != nil), err)
