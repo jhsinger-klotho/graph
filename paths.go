@@ -67,11 +67,13 @@ func CreatesCycle[K comparable, T any](g Graph[K, T], source, target K) (bool, e
 //
 // ShortestPath has a time complexity of O(|V|+|E|log(|V|)).
 func ShortestPath[K comparable, T any](g Graph[K, T], source, target K) ([]K, error) {
-
 	if g.Traits().IsDirected {
 		return bellmanFord(g, source, target)
 	}
+	return dijkstra(g, source, target)
+}
 
+func dijkstra[K comparable, T any](g Graph[K, T], source, target K) ([]K, error) {
 	weights := make(map[K]float64)
 	visited := make(map[K]bool)
 
