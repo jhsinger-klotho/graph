@@ -4,17 +4,54 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 )
 
 var ErrTargetNotReachable = errors.New("target vertex not reachable from source")
 
+type Path[K comparable] []K
+
+func PathWeight[K comparable, V any](g Graph[K, V], path Path[K]) (weight int, err error) {
+	for i := 1; i < len(path)-1; i++ {
+		var e Edge[K]
+		e, err = g.Edge(path[i-1], path[i])
+		if err != nil {
+			err = fmt.Errorf("edge(path[%d], path[%d]): %w", i-1, i, err)
+			return
+		}
+		weight += e.Properties.Weight
+	}
+	return
+}
+
+func (p Path[K]) Contains(k K) bool {
+	for _, elem := range p {
+		if elem == k {
+			return true
+		}
+	}
+	return false
+}
+
+// GraphCycles is used for graphs that can provide more efficient
+// implementations of the CreatesCycle method.
+type GraphCycles[K comparable] interface {
+	CreatesCycle(source, target K) (bool, error)
+}
+
 // CreatesCycle determines whether adding an edge between the two given vertices
-// would introduce a cycle in the graph. CreatesCycle will not create an edge.
+// would introduce a cycle in the graph.
 //
 // A potential edge would create a cycle if the target vertex is also a parent
 // of the source vertex. In order to determine this, CreatesCycle runs a DFS.
-func CreatesCycle[K comparable, T any](g Graph[K, T], source, target K) (bool, error) {
+func CreatesCycle[K comparable, T any](g interface {
+	Graph[K, T]
+	GraphRelations[K]
+}, source, target K) (bool, error) {
+	if cycler, ok := g.(GraphCycles[K]); ok {
+		return cycler.CreatesCycle(source, target)
+	}
 	if _, err := g.Vertex(source); err != nil {
 		return false, fmt.Errorf("could not get source vertex: %w", err)
 	}
@@ -58,6 +95,10 @@ func CreatesCycle[K comparable, T any](g Graph[K, T], source, target K) (bool, e
 	return false, nil
 }
 
+type ShortestPather[K comparable] interface {
+	ShortestPath(target K) (Path[K], error)
+}
+
 // ShortestPath computes the shortest path between a source and a target vertex
 // under consideration of the edge weights. It returns a slice of hash values of
 // the vertices forming that path.
@@ -67,40 +108,70 @@ func CreatesCycle[K comparable, T any](g Graph[K, T], source, target K) (bool, e
 // there be multiple shortest paths, and arbitrary one will be returned.
 //
 // ShortestPath has a time complexity of O(|V|+|E|log(|V|)).
-func ShortestPath[K comparable, T any](g Graph[K, T], source, target K) ([]K, error) {
-	if g.Traits().IsDirected {
-		return bellmanFord(g, source, target, nil)
-	}
-	return dijkstra(g, source, target)
+func ShortestPath[K comparable, T any](g Graph[K, T], source, target K) (Path[K], error) {
+	return BellmanFordShortestPath(g, source, nil).ShortestPath(target)
 }
 
-func ShortestPathStable[K comparable, T any](g Graph[K, T], source, target K, less func(a, b K) bool) ([]K, error) {
-	if g.Traits().IsDirected {
-		return bellmanFord(g, source, target, less)
-	}
-	return nil, errors.New("ShortestPathStable only currently supported for directed graphs")
+func ShortestPathStable[K comparable, T any](g Graph[K, T], source, target K, less func(a, b K) bool) (Path[K], error) {
+	return BellmanFordShortestPath(g, source, less).ShortestPath(target)
 }
 
-func dijkstra[K comparable, T any](g Graph[K, T], source, target K) ([]K, error) {
+type shortestPathResult[K comparable] struct {
+	source K
+	prev   map[K]K
+}
+
+func (b shortestPathResult[K]) ShortestPath(target K) (Path[K], error) {
+	var path Path[K]
+	u := target
+	for u != b.source {
+		next, ok := b.prev[u]
+		if !ok {
+			return nil, ErrTargetNotReachable
+		}
+		path = append(path, u)
+		u = next
+	}
+	path = append(path, b.source)
+	slices.Reverse(path)
+	return path, nil
+}
+
+type errShortestPath[K comparable] struct {
+	err error
+}
+
+func (b errShortestPath[K]) ShortestPath(target K) (Path[K], error) {
+	return nil, b.err
+}
+
+func DijkstraShortestPath[K comparable, T any](g Graph[K, T], source K) ShortestPather[K] {
 	weights := make(map[K]float64)
-	visited := make(map[K]bool)
 
 	weights[source] = 0
-	visited[target] = true
 
 	queue := newPriorityQueue[K]()
-	adjacencyMap, err := g.AdjacencyMap()
+	adjacencyMap, err := AdjacencyMap[K, T](g)
 	if err != nil {
-		return nil, fmt.Errorf("could not get adjacency map: %w", err)
+		return errShortestPath[K]{err: fmt.Errorf("could not get adjacency map: %w", err)}
 	}
 
 	for hash := range adjacencyMap {
 		if hash != source {
 			weights[hash] = math.Inf(1)
-			visited[hash] = false
 		}
 
 		queue.Push(hash, weights[hash])
+	}
+
+	isWeighted := false
+	for _, adj := range adjacencyMap {
+		for _, edge := range adj {
+			if edge.Properties.Weight != 0 {
+				isWeighted = true
+				break
+			}
+		}
 	}
 
 	// bestPredecessors stores the cheapest or least-weighted predecessor for
@@ -118,7 +189,7 @@ func dijkstra[K comparable, T any](g Graph[K, T], source, target K) ([]K, error)
 			// Setting the weight to 1 is required for unweighted graphs whose
 			// edge weights are 0. Otherwise, all paths would have a sum of 0
 			// and a random path would be returned.
-			if !g.Traits().IsWeighted {
+			if !isWeighted {
 				edgeWeight = 1
 			}
 
@@ -132,42 +203,25 @@ func dijkstra[K comparable, T any](g Graph[K, T], source, target K) ([]K, error)
 		}
 	}
 
-	path := []K{target}
-	current := target
-
-	for current != source {
-		// If the current vertex is not present in bestPredecessors, current is
-		// set to the zero value of K. Without this check, this would lead to an
-		// endless prepending of zero values to the path. Also, the target would
-		// not be reachable from one of the preceding vertices.
-		if _, ok := bestPredecessors[current]; !ok {
-			return nil, ErrTargetNotReachable
-		}
-		current = bestPredecessors[current]
-		path = append([]K{current}, path...)
+	return shortestPathResult[K]{
+		source: source,
+		prev:   bestPredecessors,
 	}
-
-	return path, nil
 }
 
-// bellmanFord is a helper function for ShortestPath that uses the Bellman-Ford algorithm to
+// BellmanFordShortestPath is a helper function for ShortestPath that uses the Bellman-Ford algorithm to
 // compute the shortest path between a source and a target vertex using the edge weights and returns
 // the hash values of the vertices forming that path. This search runs in O(|V|*|E|) time.
 //
 // The returned path includes the source and target vertices. If the target cannot be reached
 // from the source vertex, ErrTargetNotReachable will be returned. If there are multiple shortest
-func bellmanFord[K comparable, T any](g Graph[K, T], source, target K, less func(a, b K) bool) ([]K, error) {
-
-	if !g.Traits().IsDirected {
-		return nil, errors.New("Bellman-Ford algorithm can only be used on directed graphs")
-	}
-
+func BellmanFordShortestPath[K comparable, T any](g Graph[K, T], source K, less func(a, b K) bool) ShortestPather[K] {
 	dist := make(map[K]int)
-	prev := make(map[K]K)
+	bestPredecessors := make(map[K]K)
 
-	adjacencyMap, err := g.AdjacencyMap()
+	adjacencyMap, err := AdjacencyMap[K, T](g)
 	if err != nil {
-		return nil, fmt.Errorf("could not get adjacency map: %w", err)
+		return errShortestPath[K]{err: fmt.Errorf("could not get adjacency map: %w", err)}
 	}
 	keys := make([]K, 0, len(adjacencyMap))
 	for key := range adjacencyMap {
@@ -181,13 +235,27 @@ func bellmanFord[K comparable, T any](g Graph[K, T], source, target K, less func
 		})
 	}
 
+	isWeighted := false
+	for _, adj := range adjacencyMap {
+		for _, edge := range adj {
+			if edge.Properties.Weight != 0 {
+				isWeighted = true
+				break
+			}
+		}
+	}
+
 	for i := 0; i < len(adjacencyMap)-1; i++ {
 		for _, key := range keys {
 			edges := adjacencyMap[key]
 			for _, edge := range edges {
-				if newDist := dist[key] + edge.Properties.Weight; newDist < dist[edge.Target] {
+				weight := edge.Properties.Weight
+				if !isWeighted {
+					weight = 1
+				}
+				if newDist := dist[key] + weight; newDist < dist[edge.Target] {
 					dist[edge.Target] = newDist
-					prev[edge.Target] = key
+					bestPredecessors[edge.Target] = key
 				}
 			}
 		}
@@ -195,23 +263,20 @@ func bellmanFord[K comparable, T any](g Graph[K, T], source, target K, less func
 
 	for _, edges := range adjacencyMap {
 		for _, edge := range edges {
-			if newDist := dist[edge.Source] + edge.Properties.Weight; newDist < dist[edge.Target] {
-				return nil, errors.New("graph contains a negative-weight cycle")
+			weight := edge.Properties.Weight
+			if !isWeighted {
+				weight = 1
+			}
+			if newDist := dist[edge.Source] + weight; newDist < dist[edge.Target] {
+				return errShortestPath[K]{err: errors.New("graph contains a negative-weight cycle")}
 			}
 		}
 	}
 
-	path := []K{}
-	u := target
-	for u != source {
-		if _, ok := prev[u]; !ok {
-			return nil, ErrTargetNotReachable
-		}
-		path = append([]K{u}, path...)
-		u = prev[u]
+	return shortestPathResult[K]{
+		source: source,
+		prev:   bestPredecessors,
 	}
-	path = append([]K{source}, path...)
-	return path, nil
 }
 
 type sccState[K comparable] struct {
@@ -230,11 +295,7 @@ type sccState[K comparable] struct {
 //
 // StronglyConnectedComponents can only run on directed graphs.
 func StronglyConnectedComponents[K comparable, T any](g Graph[K, T]) ([][]K, error) {
-	if !g.Traits().IsDirected {
-		return nil, errors.New("SCCs can only be detected in directed graphs")
-	}
-
-	adjacencyMap, err := g.AdjacencyMap()
+	adjacencyMap, err := AdjacencyMap[K, T](g)
 	if err != nil {
 		return nil, fmt.Errorf("could not get adjacency map: %w", err)
 	}
@@ -313,7 +374,7 @@ func findSCC[K comparable](vertexHash K, state *sccState[K]) {
 // AllPathsBetween utilizes a non-recursive, stack-based implementation. It has
 // an estimated runtime complexity of O(n^2) where n is the number of vertices.
 func AllPathsBetween[K comparable, T any](g Graph[K, T], start, end K) ([][]K, error) {
-	adjacencyMap, err := g.AdjacencyMap()
+	adjacencyMap, err := AdjacencyMap[K, T](g)
 	if err != nil {
 		return nil, err
 	}

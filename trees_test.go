@@ -1,30 +1,10 @@
 package graph
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 )
-
-func TestDirectedMinimumSpanningTree(t *testing.T) {
-	tests := map[string]struct {
-		shouldFail bool
-	}{
-		"returns error": {
-			shouldFail: true,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			graph := New(IntHash, Directed())
-
-			_, err := MinimumSpanningTree(graph)
-
-			if test.shouldFail != (err != nil) {
-				t.Errorf("expected error == %v, got %v", test.shouldFail, err)
-			}
-		})
-	}
-}
 
 func TestUndirectedMinimumSpanningTree(t *testing.T) {
 	tests := map[string]struct {
@@ -87,45 +67,25 @@ func TestUndirectedMinimumSpanningTree(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			g := New(StringHash)
+			g := NewMemoryUndirected(StringHash)
 
 			for _, vertex := range test.vertices {
 				_ = g.AddVertex(vertex)
 			}
 
 			for _, edge := range test.edges {
-				_ = g.AddEdge(copyEdge(edge))
+				_ = g.AddEdge(EdgeCopy(edge))
 			}
 
-			mst, _ := MinimumSpanningTree(g)
+			mst := NewMemoryUndirected(StringHash)
+
+			_ = MinimumSpanningTree(g, mst)
 			adjacencyMap, _ := mst.AdjacencyMap()
 
-			edgesAreEqual := g.(*undirected[string, string]).edgesAreEqual
+			edgesAreEqual := edgesEqualFunc(StringHash)
 
 			if !adjacencyMapsAreEqual(test.expectedMSTAdjacencyMap, adjacencyMap, edgesAreEqual) {
-				t.Fatalf("expected adjacency map %v, got %v", test.expectedMSTAdjacencyMap, adjacencyMap)
-			}
-		})
-	}
-}
-
-func TestDirectedMaximumSpanningTree(t *testing.T) {
-	tests := map[string]struct {
-		shouldFail bool
-	}{
-		"returns error": {
-			shouldFail: true,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			graph := New(IntHash, Directed())
-
-			_, err := MaximumSpanningTree(graph)
-
-			if test.shouldFail != (err != nil) {
-				t.Errorf("expected error == %v, got %v", test.shouldFail, err)
+				t.Fatalf("expected adjacency map %s, got %s", mapToString(test.expectedMSTAdjacencyMap), mapToString(adjacencyMap))
 			}
 		})
 	}
@@ -192,24 +152,90 @@ func TestUndirectedMaximumSpanningTree(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			g := New(StringHash)
+			g := NewMemoryUndirected(StringHash)
 
 			for _, vertex := range test.vertices {
 				_ = g.AddVertex(vertex)
 			}
 
 			for _, edge := range test.edges {
-				_ = g.AddEdge(copyEdge(edge))
+				_ = g.AddEdge(EdgeCopy(edge))
 			}
 
-			mst, _ := MaximumSpanningTree(g)
+			mst := NewMemoryUndirected(StringHash)
+			_ = MaximumSpanningTree(g, mst)
 			adjacencyMap, _ := mst.AdjacencyMap()
 
-			edgesAreEqual := g.(*undirected[string, string]).edgesAreEqual
+			edgesAreEqual := edgesEqualFunc(StringHash)
 
 			if !adjacencyMapsAreEqual(test.expectedMSTAdjacencyMap, adjacencyMap, edgesAreEqual) {
-				t.Fatalf("expected adjacency map %v, got %v", test.expectedMSTAdjacencyMap, adjacencyMap)
+				t.Fatalf("expected adjacency map %v, got %v", mapToString(test.expectedMSTAdjacencyMap), mapToString(adjacencyMap))
 			}
 		})
 	}
+}
+
+func adjacencyMapsAreEqual[K comparable](a, b map[K]map[K]Edge[K], edgesAreEqual func(a, b Edge[K]) bool) bool {
+	for aHash, aAdjacencies := range a {
+		bAdjacencies, ok := b[aHash]
+		if !ok {
+			return false
+		}
+
+		for aAdjacency, aEdge := range aAdjacencies {
+			bEdge, ok := bAdjacencies[aAdjacency]
+			if !ok {
+				return false
+			}
+
+			if !edgesAreEqual(aEdge, bEdge) {
+				return false
+			}
+
+			for aKey, aValue := range aEdge.Properties.Attributes {
+				bValue, ok := bEdge.Properties.Attributes[aKey]
+				if !ok {
+					return false
+				}
+				if bValue != aValue {
+					return false
+				}
+			}
+
+			if bEdge.Properties.Weight != aEdge.Properties.Weight {
+				return false
+			}
+		}
+	}
+
+	for aHash := range a {
+		if _, ok := b[aHash]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+func mapToString(m map[string]map[string]Edge[string]) string {
+	sb := strings.Builder{}
+	sb.WriteString("{")
+	for src, v := range m {
+		if len(v) == 0 {
+			comma := ""
+			if sb.Len() > 1 {
+				comma = ", "
+			}
+			fmt.Fprintf(&sb, "%s%s", comma, src)
+		}
+		for trg := range v {
+			comma := ""
+			if sb.Len() > 1 {
+				comma = ", "
+			}
+			fmt.Fprintf(&sb, "%s%s -> %s", comma, src, trg)
+		}
+	}
+	sb.WriteString("}")
+	return sb.String()
 }

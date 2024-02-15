@@ -18,7 +18,7 @@ func TestGenerateDOT(t *testing.T) {
 		expected         Description
 	}{
 		"3-vertex directed graph": {
-			graph:      graph.New(graph.StringHash, graph.Directed()),
+			graph:      graph.NewMemoryGraph(graph.StringHash),
 			attributes: map[string]string{},
 			vertices:   []string{"1", "2", "3"},
 			edges: []graph.Edge[string]{
@@ -39,7 +39,7 @@ func TestGenerateDOT(t *testing.T) {
 			},
 		},
 		"3-vertex directed, weighted graph with weights and attributes": {
-			graph:      graph.New(graph.StringHash, graph.Directed(), graph.Weighted()),
+			graph:      graph.NewMemoryGraph(graph.StringHash),
 			attributes: map[string]string{},
 			vertices:   []string{"1", "2", "3"},
 			edges: []graph.Edge[string]{
@@ -76,7 +76,7 @@ func TestGenerateDOT(t *testing.T) {
 			},
 		},
 		"vertices with attributes": {
-			graph:      graph.New(graph.StringHash, graph.Directed(), graph.Weighted()),
+			graph:      graph.NewMemoryGraph(graph.StringHash),
 			attributes: map[string]string{},
 			vertices:   []string{"1", "2"},
 			vertexProperties: map[string]graph.VertexProperties{
@@ -123,7 +123,7 @@ func TestGenerateDOT(t *testing.T) {
 			},
 		},
 		"directed graph with attributes": {
-			graph: graph.New(graph.StringHash, graph.Directed()),
+			graph: graph.NewMemoryGraph(graph.StringHash),
 			attributes: map[string]string{
 				"label":     "my-graph",
 				"normalize": "true",
@@ -189,7 +189,7 @@ func TestGenerateDOT(t *testing.T) {
 			}
 		}
 
-		desc, _ := generateDOT(test.graph)
+		desc, _ := generateDOT(test.graph, DirectedGraph())
 
 		// Add the graph attributes manually instead of using the functional
 		// option. This is the reason why I dislike them more and more.

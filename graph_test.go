@@ -1,97 +1,8 @@
 package graph
 
 import (
-	"reflect"
 	"testing"
 )
-
-func TestNew(t *testing.T) {
-	directedType := reflect.TypeOf(&directed[int, int]{})
-	undirectedType := reflect.TypeOf(&undirected[int, int]{})
-
-	tests := map[string]struct {
-		expectedType reflect.Type
-		options      []func(*Traits)
-	}{
-		"no options": {
-			options:      []func(*Traits){},
-			expectedType: undirectedType,
-		},
-		"directed option": {
-			options:      []func(*Traits){Directed()},
-			expectedType: directedType,
-		},
-	}
-
-	for name, test := range tests {
-		graph := New(IntHash, test.options...)
-		actualType := reflect.TypeOf(graph)
-
-		if actualType != test.expectedType {
-			t.Errorf("%s: graph type expectancy doesn't match: expected %v, got %v", name, test.expectedType, actualType)
-		}
-	}
-}
-
-func TestNewLike(t *testing.T) {
-	tests := map[string]struct {
-		g        Graph[int, int]
-		vertices []int
-	}{
-		"new directed graph of integers": {
-			g:        New(IntHash, Directed()),
-			vertices: []int{1, 2, 3},
-		},
-		"new undirected weighted graph of integers": {
-			g:        New(IntHash, Weighted()),
-			vertices: []int{1, 2, 3},
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			for _, vertex := range test.vertices {
-				_ = test.g.AddVertex(vertex)
-			}
-
-			h := NewLike(test.g)
-
-			if len(test.vertices) > 0 {
-				if _, err := h.Vertex(test.vertices[0]); err == nil {
-					t.Errorf("expected vertex %v not to exist in h", test.vertices[0])
-				}
-			}
-
-			if test.g.Traits().IsDirected {
-				actual, ok := h.(*directed[int, int])
-				if !ok {
-					t.Fatalf("type assertion to *directed failed")
-				}
-
-				expected := test.g.(*directed[int, int])
-
-				if actual.hash(42) != expected.hash(42) {
-					t.Errorf("expected hash %v, got %v", expected.hash, actual.hash)
-				}
-			} else {
-				actual, ok := h.(*undirected[int, int])
-				if !ok {
-					t.Fatalf("type assertion to *directed failed")
-				}
-
-				expected := test.g.(*undirected[int, int])
-
-				if actual.hash(42) != expected.hash(42) {
-					t.Errorf("expected hash %v, got %v", expected.hash, actual.hash)
-				}
-			}
-
-			if !traitsAreEqual(h.Traits(), test.g.Traits()) {
-				t.Errorf("expected traits %+v, got %+v", test.g.Traits(), h.Traits())
-			}
-		})
-	}
-}
 
 func TestStringHash(t *testing.T) {
 	tests := map[string]struct {
@@ -295,4 +206,51 @@ func TestVertexAttributes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEdgesEqual(t *testing.T) {
+	tests := map[string]struct {
+		a             Edge[int]
+		b             Edge[int]
+		edgesAreEqual bool
+	}{
+		"equal edges in directed graph": {
+			a:             Edge[int]{Source: 1, Target: 2},
+			b:             Edge[int]{Source: 1, Target: 2},
+			edgesAreEqual: true,
+		},
+		"swapped equal edges in directed graph": {
+			a: Edge[int]{Source: 1, Target: 2},
+			b: Edge[int]{Source: 2, Target: 1},
+		},
+	}
+
+	for name, test := range tests {
+		actual := EdgesEqual(IntHash, test.a, test.b)
+
+		if actual != test.edgesAreEqual {
+			t.Errorf("%s: equality expectations don't match: expected %v, got %v", name, test.edgesAreEqual, actual)
+		}
+	}
+}
+
+func mapsAreEqual[K comparable](a, b map[K]K) bool {
+	for aHash, aValue := range a {
+		bValue, ok := b[aHash]
+		if !ok {
+			return false
+		}
+
+		if aValue != bValue {
+			return false
+		}
+	}
+
+	for aHash := range a {
+		if _, ok := b[aHash]; !ok {
+			return false
+		}
+	}
+
+	return true
 }

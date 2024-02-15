@@ -90,7 +90,14 @@ func GraphAttribute(key, value string) func(*Description) {
 	}
 }
 
-func generateDOT[K comparable, T any](g graph.Graph[K, T], options ...func(*Description)) (Description, error) {
+func DirectedGraph() func(*Description) {
+	return func(d *Description) {
+		d.GraphType = "digraph"
+		d.EdgeOperator = "->"
+	}
+}
+
+func generateDOT[K comparable, T any](g graph.GraphRead[K, T], options ...func(*Description)) (Description, error) {
 	desc := Description{
 		GraphType:    "graph",
 		Attributes:   make(map[string]string),
@@ -102,32 +109,27 @@ func generateDOT[K comparable, T any](g graph.Graph[K, T], options ...func(*Desc
 		option(&desc)
 	}
 
-	if g.Traits().IsDirected {
-		desc.GraphType = "digraph"
-		desc.EdgeOperator = "->"
-	}
-
-	adjacencyMap, err := g.AdjacencyMap()
+	adjacencyMap, err := graph.AdjacencyMap(g)
 	if err != nil {
 		return desc, err
 	}
 
-	for vertex, adjacencies := range adjacencyMap {
-		_, sourceProperties, err := g.VertexWithProperties(vertex)
+	for sourceK, adjacencies := range adjacencyMap {
+		sourceV, err := g.Vertex(sourceK)
 		if err != nil {
 			return desc, err
 		}
 
 		stmt := Statement{
-			Source:           vertex,
-			SourceWeight:     sourceProperties.Weight,
-			SourceAttributes: sourceProperties.Attributes,
+			Source:           sourceK,
+			SourceWeight:     sourceV.Properties.Weight,
+			SourceAttributes: sourceV.Properties.Attributes,
 		}
 		desc.Statements = append(desc.Statements, stmt)
 
 		for adjacency, edge := range adjacencies {
 			stmt := Statement{
-				Source:         vertex,
+				Source:         sourceK,
 				Target:         adjacency,
 				EdgeWeight:     edge.Properties.Weight,
 				EdgeAttributes: edge.Properties.Attributes,

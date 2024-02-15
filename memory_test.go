@@ -5,31 +5,6 @@ import (
 	"testing"
 )
 
-func TestDirected_Traits(t *testing.T) {
-	tests := map[string]struct {
-		traits   *Traits
-		expected *Traits
-	}{
-		"default traits": {
-			traits:   &Traits{},
-			expected: &Traits{},
-		},
-		"directed": {
-			traits:   &Traits{IsDirected: true},
-			expected: &Traits{IsDirected: true},
-		},
-	}
-
-	for name, test := range tests {
-		g := newDirected(IntHash, test.traits, newMemoryStore[int, int]())
-		traits := g.Traits()
-
-		if !traitsAreEqual(traits, test.expected) {
-			t.Errorf("%s: traits expectancy doesn't match: expected %v, got %v", name, test.expected, traits)
-		}
-	}
-}
-
 func TestDirected_AddVertex(t *testing.T) {
 	tests := map[string]struct {
 		vertices           []int
@@ -60,7 +35,7 @@ func TestDirected_AddVertex(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
+		graph := NewMemoryGraph(IntHash)
 
 		var err error
 
@@ -81,15 +56,15 @@ func TestDirected_AddVertex(t *testing.T) {
 			t.Errorf("%s: error expectancy doesn't match: expected %v, got %v", name, test.finallyExpectedError, err)
 		}
 
-		graphStore := graph.store.(*memoryStore[int, int])
 		for _, vertex := range test.vertices {
-			if len(graphStore.vertices) != len(test.expectedVertices) {
-				t.Errorf("%s: vertex count doesn't match: expected %v, got %v", name, len(test.expectedVertices), len(graphStore.vertices))
+			if len(graph.vertices) != len(test.expectedVertices) {
+				t.Errorf("%s: vertex count doesn't match: expected %v, got %v", name, len(test.expectedVertices), len(graph.vertices))
 			}
 
 			hash := graph.hash(vertex)
-			if _, _, err := graph.store.Vertex(hash); err != nil {
-				vertices := graphStore.vertices
+			vertex, err := graph.Vertex(hash)
+			if err != nil {
+				vertices := graph.vertices
 				t.Errorf("%s: vertex %v not found in graph: %v", name, vertex, vertices)
 			}
 
@@ -97,16 +72,16 @@ func TestDirected_AddVertex(t *testing.T) {
 				continue
 			}
 
-			if graphStore.vertexProperties[hash].Weight != test.expectedProperties.Weight {
-				t.Errorf("%s: edge weights don't match: expected weight %v, got %v", name, test.expectedProperties.Weight, graphStore.vertexProperties[hash].Weight)
+			if vertex.Properties.Weight != test.expectedProperties.Weight {
+				t.Errorf("%s: edge weights don't match: expected weight %v, got %v", name, test.expectedProperties.Weight, vertex.Properties.Weight)
 			}
 
-			if len(graphStore.vertexProperties[hash].Attributes) != len(test.expectedProperties.Attributes) {
-				t.Fatalf("%s: attributes lengths don't match: expcted %v, got %v", name, len(test.expectedProperties.Attributes), len(graphStore.vertexProperties[hash].Attributes))
+			if len(vertex.Properties.Attributes) != len(test.expectedProperties.Attributes) {
+				t.Fatalf("%s: attributes lengths don't match: expcted %v, got %v", name, len(test.expectedProperties.Attributes), len(vertex.Properties.Attributes))
 			}
 
 			for expectedKey, expectedValue := range test.expectedProperties.Attributes {
-				value, ok := graphStore.vertexProperties[hash].Attributes[expectedKey]
+				value, ok := vertex.Properties.Attributes[expectedKey]
 				if !ok {
 					t.Errorf("%s: attribute keys don't match: expected key %v not found", name, expectedKey)
 				}
@@ -115,99 +90,6 @@ func TestDirected_AddVertex(t *testing.T) {
 				}
 			}
 		}
-	}
-}
-
-func TestDirected_AddVerticesFrom(t *testing.T) {
-	tests := map[string]struct {
-		vertices           []int
-		properties         map[int]VertexProperties
-		existingVertices   []int
-		expectedVertices   []int
-		expectedProperties map[int]VertexProperties
-		expectedError      error
-	}{
-		"graph with 3 vertices": {
-			vertices: []int{1, 2, 3},
-			properties: map[int]VertexProperties{
-				1: {
-					Attributes: map[string]string{"color": "red"},
-					Weight:     10,
-				},
-				2: {
-					Attributes: map[string]string{"color": "green"},
-					Weight:     20,
-				},
-				3: {
-					Attributes: map[string]string{"color": "blue"},
-					Weight:     30,
-				},
-			},
-			existingVertices: []int{},
-			expectedVertices: []int{1, 2, 3},
-			expectedProperties: map[int]VertexProperties{
-				1: {
-					Attributes: map[string]string{"color": "red"},
-					Weight:     10,
-				},
-				2: {
-					Attributes: map[string]string{"color": "green"},
-					Weight:     20,
-				},
-				3: {
-					Attributes: map[string]string{"color": "blue"},
-					Weight:     30,
-				},
-			},
-		},
-		"graph with duplicated vertex": {
-			vertices:           []int{1, 2, 3},
-			properties:         map[int]VertexProperties{},
-			existingVertices:   []int{2},
-			expectedVertices:   []int{1},
-			expectedProperties: map[int]VertexProperties{},
-			expectedError:      ErrVertexAlreadyExists,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			source := New(IntHash, Directed())
-
-			for _, vertex := range test.vertices {
-				_ = source.AddVertex(vertex, copyVertexProperties(test.properties[vertex]))
-			}
-
-			g := New(IntHash, Directed())
-
-			for _, vertex := range test.existingVertices {
-				_ = g.AddVertex(vertex)
-			}
-
-			err := g.AddVerticesFrom(source)
-
-			if !errors.Is(err, test.expectedError) {
-				t.Errorf("expected error %v, got %v", test.expectedError, err)
-			}
-
-			if err != nil {
-				return
-			}
-
-			for _, vertex := range test.expectedVertices {
-				_, actualProperties, err := g.VertexWithProperties(vertex)
-				if err != nil {
-					t.Errorf("failed to get vertex %v with properties: %v", vertex, err.Error())
-					return
-				}
-
-				if expectedProperties, ok := test.expectedProperties[vertex]; ok {
-					if !vertexPropertiesAreEqual(expectedProperties, actualProperties) {
-						t.Errorf("expected properties %v for %v, got %v", expectedProperties, vertex, actualProperties)
-					}
-				}
-			}
-		})
 	}
 }
 
@@ -229,7 +111,7 @@ func TestDirected_Vertex(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
+		graph := NewMemoryGraph(IntHash)
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)
@@ -245,7 +127,7 @@ func TestDirected_Vertex(t *testing.T) {
 			continue
 		}
 
-		if vertex != test.vertex {
+		if vertex.Value != test.vertex {
 			t.Errorf("%s: vertex expectancy doesn't match: expected %v, got %v", name, test.vertex, vertex)
 		}
 	}
@@ -283,7 +165,7 @@ func TestDirected_RemoveVertex(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := New(IntHash, Directed())
+		graph := NewMemoryGraph(IntHash)
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)
@@ -305,7 +187,6 @@ func TestDirected_AddEdge(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []int
 		edges         []Edge[int]
-		traits        *Traits
 		expectedEdges []Edge[int]
 		// Even though some AddVertex calls might work, at least one of them
 		// could fail, e.g. if the last call would introduce a cycle.
@@ -317,7 +198,6 @@ func TestDirected_AddEdge(t *testing.T) {
 				{Source: 1, Target: 2, Properties: EdgeProperties{Weight: 10}},
 				{Source: 1, Target: 3, Properties: EdgeProperties{Weight: 20}},
 			},
-			traits: &Traits{},
 			expectedEdges: []Edge[int]{
 				{Source: 1, Target: 2, Properties: EdgeProperties{Weight: 10}},
 				{Source: 1, Target: 3, Properties: EdgeProperties{Weight: 20}},
@@ -328,20 +208,7 @@ func TestDirected_AddEdge(t *testing.T) {
 			edges: []Edge[int]{
 				{Source: 1, Target: 3, Properties: EdgeProperties{Weight: 20}},
 			},
-			traits:               &Traits{},
 			finallyExpectedError: ErrVertexNotFound,
-		},
-		"edge introducing a cycle in an acyclic graph": {
-			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
-				{Source: 1, Target: 2},
-				{Source: 2, Target: 3},
-				{Source: 3, Target: 1},
-			},
-			traits: &Traits{
-				PreventCycles: true,
-			},
-			finallyExpectedError: ErrEdgeCreatesCycle,
 		},
 		"edge already exists": {
 			vertices: []int{1, 2, 3},
@@ -351,7 +218,6 @@ func TestDirected_AddEdge(t *testing.T) {
 				{Source: 3, Target: 1},
 				{Source: 3, Target: 1},
 			},
-			traits:               &Traits{},
 			finallyExpectedError: ErrEdgeAlreadyExists,
 		},
 		"edge with attributes": {
@@ -378,7 +244,6 @@ func TestDirected_AddEdge(t *testing.T) {
 					},
 				},
 			},
-			traits: &Traits{},
 		},
 		"edge with data": {
 			vertices: []int{1, 2},
@@ -400,12 +265,11 @@ func TestDirected_AddEdge(t *testing.T) {
 					},
 				},
 			},
-			traits: &Traits{},
 		},
 	}
 
 	for name, test := range tests {
-		graph := newDirected(IntHash, test.traits, newMemoryStore[int, int]())
+		graph := NewMemoryGraph(IntHash)
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)
@@ -414,21 +278,7 @@ func TestDirected_AddEdge(t *testing.T) {
 		var err error
 
 		for _, edge := range test.edges {
-			if len(edge.Properties.Attributes) == 0 {
-				err = graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight), EdgeData(edge.Properties.Data))
-			}
-			// If there are edge attributes, iterate over them and call the
-			// EdgeAttribute functional option for each entry. An edge should
-			// only have one attribute so that AddEdge is invoked once.
-			for key, value := range edge.Properties.Attributes {
-				err = graph.AddEdge(
-					edge.Source,
-					edge.Target,
-					EdgeWeight(edge.Properties.Weight),
-					EdgeData(edge.Properties.Data),
-					EdgeAttribute(key, value),
-				)
-			}
+			err = graph.AddEdge(EdgeCopy(edge))
 			if err != nil {
 				break
 			}
@@ -451,151 +301,6 @@ func TestDirected_AddEdge(t *testing.T) {
 				t.Errorf("%s: expected edge %v, got %v", name, expectedEdge, edge)
 			}
 		}
-	}
-}
-
-func TestDirected_AddEdgesFrom(t *testing.T) {
-	tests := map[string]struct {
-		vertices         []int
-		edges            []Edge[int]
-		existingVertices []int
-		existingEdges    []Edge[int]
-		expectedEdges    []Edge[int]
-		expectedError    error
-	}{
-		"graph with 3 edges": {
-			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
-				{
-					Source: 1,
-					Target: 2,
-					Properties: EdgeProperties{
-						Weight: 10,
-						Attributes: map[string]string{
-							"color": "red",
-						},
-					},
-				},
-				{
-					Source: 2,
-					Target: 3,
-					Properties: EdgeProperties{
-						Weight: 20,
-						Attributes: map[string]string{
-							"color": "green",
-						},
-					},
-				},
-				{
-					Source: 3,
-					Target: 1,
-					Properties: EdgeProperties{
-						Weight: 30,
-						Attributes: map[string]string{
-							"color": "blue",
-						},
-					},
-				},
-			},
-			existingVertices: []int{1, 2, 3},
-			existingEdges:    []Edge[int]{},
-			expectedEdges: []Edge[int]{
-				{
-					Source: 1,
-					Target: 2,
-					Properties: EdgeProperties{
-						Weight: 10,
-						Attributes: map[string]string{
-							"color": "red",
-						},
-					},
-				},
-				{
-					Source: 2,
-					Target: 3,
-					Properties: EdgeProperties{
-						Weight: 20,
-						Attributes: map[string]string{
-							"color": "green",
-						},
-					},
-				},
-				{
-					Source: 3,
-					Target: 1,
-					Properties: EdgeProperties{
-						Weight: 30,
-						Attributes: map[string]string{
-							"color": "blue",
-						},
-					},
-				},
-			},
-			expectedError: nil,
-		},
-		"edge with non-existing vertex": {
-			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
-				{Source: 1, Target: 3},
-			},
-			existingVertices: []int{1, 2},
-			existingEdges:    []Edge[int]{},
-			expectedEdges:    []Edge[int]{},
-			expectedError:    ErrVertexNotFound,
-		},
-		"graph with duplicated edge": {
-			vertices: []int{1, 2},
-			edges: []Edge[int]{
-				{Source: 1, Target: 2},
-			},
-			existingVertices: []int{1, 2},
-			existingEdges: []Edge[int]{
-				{Source: 1, Target: 2},
-			},
-			expectedEdges: []Edge[int]{},
-			expectedError: ErrEdgeAlreadyExists,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			source := New(IntHash, Directed())
-
-			for _, vertex := range test.vertices {
-				_ = source.AddVertex(vertex)
-			}
-
-			for _, edge := range test.edges {
-				_ = source.AddEdge(copyEdge(edge))
-			}
-
-			g := New(IntHash, Directed())
-
-			for _, vertex := range test.existingVertices {
-				_ = g.AddVertex(vertex)
-			}
-
-			for _, edge := range test.existingEdges {
-				_ = g.AddEdge(copyEdge(edge))
-			}
-
-			err := g.AddEdgesFrom(source)
-
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("expected error %v, got %v", test.expectedError, err)
-			}
-
-			for _, edge := range test.expectedEdges {
-				actualEdge, err := g.Edge(edge.Source, edge.Target)
-				if err != nil {
-					t.Fatalf("failed to get edge: %v", err.Error())
-				}
-
-				if !edgesAreEqual(edge, actualEdge, true) {
-					t.Errorf("expected edge %v, got %v", edge, actualEdge)
-				}
-			}
-		})
 	}
 }
 
@@ -643,15 +348,7 @@ func TestDirected_Edge(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := New(IntHash, Directed())
-
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		if err := graph.AddEdge(test.edge.Source, test.edge.Target, EdgeWeight(test.edge.Properties.Weight), EdgeData(test.edge.Properties.Data)); err != nil {
-			t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-		}
+		graph := newTestGraph(test.vertices, []Edge[int]{test.edge})
 
 		edge, err := graph.Edge(test.args[0], test.args[1])
 
@@ -754,29 +451,17 @@ func TestDirected_Edges(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			g := New(IntHash, Directed())
+			g := newTestGraph(test.vertices, test.edges)
 
-			for _, vertex := range test.vertices {
-				_ = g.AddVertex(vertex)
-			}
-
-			for _, edge := range test.edges {
-				_ = g.AddEdge(copyEdge(edge))
-			}
-
-			edges, err := g.Edges()
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err.Error())
+			edges := make(map[EdgeKey[int]]Edge[int])
+			for e, _ := range g.Edges() {
+				edges[EdgeKey[int]{Source: e.Source, Target: e.Target}] = e
 			}
 
 			for _, expectedEdge := range test.expectedEdges {
-				for _, actualEdge := range edges {
-					if actualEdge.Source != expectedEdge.Source || actualEdge.Target != expectedEdge.Target {
-						continue
-					}
-					if !edgesAreEqual(expectedEdge, actualEdge, true) {
-						t.Errorf("%s: expected edge %v, got %v", name, expectedEdge, actualEdge)
-					}
+				actualEdge := edges[EdgeKey[int]{Source: expectedEdge.Source, Target: expectedEdge.Target}]
+				if !edgesAreEqual(expectedEdge, actualEdge, true) {
+					t.Errorf("%s: expected edge %v, got %v", name, expectedEdge, actualEdge)
 				}
 			}
 		})
@@ -822,17 +507,9 @@ func TestDirected_UpdateEdge(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			g := New(IntHash, Directed())
+			g := newTestGraph(test.vertices, test.edges)
 
-			for _, vertex := range test.vertices {
-				_ = g.AddVertex(vertex)
-			}
-
-			for _, edge := range test.edges {
-				_ = g.AddEdge(copyEdge(edge))
-			}
-
-			err := g.UpdateEdge(copyEdge(test.updateEdge))
+			err := g.UpdateEdge(test.updateEdge.Source, test.updateEdge.Target, EdgeCopyProperties(test.updateEdge.Properties))
 
 			if !errors.Is(err, test.expectedErr) {
 				t.Fatalf("expected error %v, got %v", test.expectedErr, err)
@@ -886,22 +563,12 @@ func TestDirected_RemoveEdge(t *testing.T) {
 			removeEdges: []Edge[int]{
 				{Source: 2, Target: 3},
 			},
-			// Expect no error because memoryStore doesn't error
+			expectedError: ErrEdgeNotFound,
 		},
 	}
 
 	for name, test := range tests {
-		graph := New(IntHash, Directed())
-
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-			}
-		}
+		graph := newTestGraph(test.vertices, test.edges)
 
 		for _, removeEdge := range test.removeEdges {
 			if err := graph.RemoveEdge(removeEdge.Source, removeEdge.Target); !errors.Is(err, test.expectedError) {
@@ -967,17 +634,7 @@ func TestDirected_AdjacencyList(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
-
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-			}
-		}
+		graph := newTestGraph(test.vertices, test.edges)
 
 		adjacencyMap, _ := graph.AdjacencyMap()
 
@@ -1050,17 +707,7 @@ func TestDirected_PredecessorMap(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
-
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-			}
-		}
+		graph := newTestGraph(test.vertices, test.edges)
 
 		predecessors, _ := graph.PredecessorMap()
 
@@ -1079,74 +726,6 @@ func TestDirected_PredecessorMap(t *testing.T) {
 					t.Errorf("%s: edge expectancy doesn't match: expected %v, got %v", name, expectedEdge, edge)
 				}
 			}
-		}
-	}
-}
-
-func TestDirected_Clone(t *testing.T) {
-	tests := map[string]struct {
-		vertices []int
-		edges    []Edge[int]
-	}{
-		"Y-shaped graph": {
-			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
-				{Source: 1, Target: 3},
-				{Source: 2, Target: 3},
-				{Source: 3, Target: 4},
-			},
-		},
-		"diamond-shaped graph": {
-			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
-				{Source: 1, Target: 2},
-				{Source: 1, Target: 3},
-				{Source: 2, Target: 4},
-				{Source: 3, Target: 4},
-			},
-		},
-	}
-
-	for name, test := range tests {
-		graph := New(IntHash, Directed())
-
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex, VertexWeight(vertex), VertexAttribute("color", "red"))
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-			}
-		}
-
-		clonedGraph, err := graph.Clone()
-		if err != nil {
-			t.Fatalf("%s: failed to clone graph: %s", name, err.Error())
-		}
-
-		expected := graph.(*directed[int, int])
-		actual := clonedGraph.(*directed[int, int])
-
-		if actual.hash(5) != expected.hash(5) {
-			t.Errorf("%s: hash expectancy doesn't match: expected %v, got %v", name, expected.hash, actual.hash)
-		}
-
-		if !traitsAreEqual(actual.traits, expected.traits) {
-			t.Errorf("%s: traits expectancy doesn't match: expected %v, got %v", name, expected.traits, actual.traits)
-		}
-
-		expectedAdjacencyMap, _ := graph.AdjacencyMap()
-		actualAdjacencyMap, _ := actual.AdjacencyMap()
-
-		if !adjacencyMapsAreEqual(expectedAdjacencyMap, actualAdjacencyMap, expected.edgesAreEqual) {
-			t.Errorf("%s: expected adjacency map %v, got %v", name, expectedAdjacencyMap, actualAdjacencyMap)
-		}
-
-		_ = clonedGraph.AddVertex(10)
-
-		if _, err := graph.Vertex(10); err == nil {
-			t.Errorf("%s: vertex 10 shouldn't exist in original graph", name)
 		}
 	}
 }
@@ -1197,17 +776,7 @@ func TestDirected_OrderAndSize(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
-
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-			}
-		}
+		graph := newTestGraph(test.vertices, test.edges)
 
 		order, _ := graph.Order()
 		size, _ := graph.Size()
@@ -1220,71 +789,6 @@ func TestDirected_OrderAndSize(t *testing.T) {
 			t.Errorf("%s: size expectancy doesn't match: expected %d, got %d", name, test.expectedSize, size)
 		}
 
-	}
-}
-
-func TestDirected_edgesAreEqual(t *testing.T) {
-	tests := map[string]struct {
-		a             Edge[int]
-		b             Edge[int]
-		edgesAreEqual bool
-	}{
-		"equal edges in directed graph": {
-			a:             Edge[int]{Source: 1, Target: 2},
-			b:             Edge[int]{Source: 1, Target: 2},
-			edgesAreEqual: true,
-		},
-		"swapped equal edges in directed graph": {
-			a: Edge[int]{Source: 1, Target: 2},
-			b: Edge[int]{Source: 2, Target: 1},
-		},
-	}
-
-	for name, test := range tests {
-		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
-		actual := graph.edgesAreEqual(test.a, test.b)
-
-		if actual != test.edgesAreEqual {
-			t.Errorf("%s: equality expectations don't match: expected %v, got %v", name, test.edgesAreEqual, actual)
-		}
-	}
-}
-
-func TestDirected_addEdge(t *testing.T) {
-	tests := map[string]struct {
-		edges []Edge[int]
-	}{
-		"add 3 edges": {
-			edges: []Edge[int]{
-				{Source: 1, Target: 2, Properties: EdgeProperties{Weight: 1}},
-				{Source: 2, Target: 3, Properties: EdgeProperties{Weight: 2}},
-				{Source: 3, Target: 1, Properties: EdgeProperties{Weight: 3}},
-			},
-		},
-	}
-
-	for name, test := range tests {
-		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
-
-		for _, edge := range test.edges {
-			_ = graph.AddVertex(edge.Source)
-			_ = graph.AddVertex(edge.Target)
-			sourceHash := graph.hash(edge.Source)
-			TargetHash := graph.hash(edge.Target)
-			err := graph.addEdge(sourceHash, TargetHash, edge)
-			if err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-			}
-		}
-
-		outEdges := graph.store.(*memoryStore[int, int]).outEdges
-		if len(outEdges) != len(test.edges) {
-			t.Errorf("%s: number of outgoing edges doesn't match: expected %v, got %v", name, len(test.edges), len(outEdges))
-		}
-		inEdges := graph.store.(*memoryStore[int, int]).inEdges
-		if len(inEdges) != len(test.edges) {
-			t.Errorf("%s: number of ingoing edges doesn't match: expected %v, got %v", name, len(test.edges), len(inEdges))
-		}
 	}
 }
 
@@ -1329,19 +833,9 @@ func TestDirected_predecessors(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := newDirected(IntHash, &Traits{}, newMemoryStore[int, int]())
+		graph := newTestGraph(test.vertices, test.edges)
 
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-			}
-		}
-
-		predecessors, _ := predecessors(graph, graph.hash(test.vertex))
+		predecessors, _ := predecessors[int](graph, graph.hash(test.vertex))
 
 		if !slicesAreEqual(predecessors, test.expectedPredecessors) {
 			t.Errorf("%s: predecessors don't match: expected %v, got %v", name, test.expectedPredecessors, predecessors)
@@ -1433,7 +927,7 @@ func edgesAreEqual[K comparable](a, b Edge[K], directed bool) bool {
 	return true
 }
 
-func predecessors[K comparable, T any](g *directed[K, T], vertexHash K) ([]K, error) {
+func predecessors[K comparable](g GraphRelations[K], vertexHash K) ([]K, error) {
 	var predecessorHashes []K
 
 	predecessorMap, err := g.PredecessorMap()
@@ -1446,4 +940,17 @@ func predecessors[K comparable, T any](g *directed[K, T], vertexHash K) ([]K, er
 	}
 
 	return predecessorHashes, nil
+}
+
+func newTestGraph(vertices []int, edges []Edge[int]) *memoryGraph[int, int] {
+	g := NewMemoryGraph(IntHash)
+
+	for _, vertex := range vertices {
+		_ = g.AddVertex(vertex)
+	}
+
+	for _, edge := range edges {
+		_ = g.AddEdge(edge.Source, edge.Target, EdgeCopyProperties(edge.Properties))
+	}
+	return g
 }

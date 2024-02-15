@@ -1,7 +1,6 @@
 package graph
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 )
@@ -17,71 +16,18 @@ import (
 //
 // TopologicalSort only works for directed acyclic graphs. This implementation
 // works non-recursively and utilizes Kahn's algorithm.
-func TopologicalSort[K comparable, T any](g Graph[K, T]) ([]K, error) {
-	if !g.Traits().IsDirected {
-		return nil, fmt.Errorf("topological sort cannot be computed on undirected graph")
-	}
-
-	predecessorMap, err := g.PredecessorMap()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get predecessor map: %w", err)
-	}
-
-	queue := make([]K, 0, len(predecessorMap))
-	queued := make(map[K]struct{})
-
-	for vertex, predecessors := range predecessorMap {
-		if len(predecessors) == 0 {
-			queue = append(queue, vertex)
-			queued[vertex] = struct{}{}
-		}
-	}
-
-	order := make([]K, 0, len(predecessorMap))
-	visited := make(map[K]struct{}, len(predecessorMap))
-
-	for len(queue) > 0 {
-		currentVertex := queue[0]
-		queue = queue[1:]
-
-		if _, ok := visited[currentVertex]; ok {
-			continue
-		}
-
-		order = append(order, currentVertex)
-		visited[currentVertex] = struct{}{}
-
-		for vertex, predecessors := range predecessorMap {
-			delete(predecessors, currentVertex)
-
-			if len(predecessors) == 0 {
-				if _, ok := queued[vertex]; !ok {
-					queue = append(queue, vertex)
-				}
-			}
-		}
-	}
-
-	if len(order) != len(predecessorMap) {
-		return nil, errors.New("topological sort cannot be computed on graph with cycles")
-	}
-
-	return order, nil
+func TopologicalSort[K comparable](predecessorMap map[K]map[K]Edge[K]) func(yield func(K, error) bool) {
+	return StableTopologicalSort(predecessorMap, nil)
 }
 
 // StableTopologicalSort does the same as [TopologicalSort], but takes a function
 // for comparing (and then ordering) two given vertices. This allows for a stable
 // and deterministic output even for graphs with multiple topological orderings.
-func StableTopologicalSort[K comparable, T any](g Graph[K, T], less func(K, K) bool) ([]K, error) {
-	if !g.Traits().IsDirected {
-		return nil, fmt.Errorf("topological sort cannot be computed on undirected graph")
-	}
-
-	predecessorMap, err := g.PredecessorMap()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get predecessor map: %w", err)
-	}
-
+// If the less function is nil, the order will be non-deterministic as in [TopologicalSort].
+// Use [PredecessorMap] to get normal topological order; use [AdjacencyMap] to get
+// reverse topological order.
+// Note, this function is destructive to the map.
+func StableTopologicalSort[K comparable](predecessorMap map[K]map[K]Edge[K], less func(K, K) bool) func(yield func(K, error) bool) {
 	queue := make([]K, 0, len(predecessorMap))
 	queued := make(map[K]struct{}, len(predecessorMap))
 
@@ -89,81 +35,70 @@ func StableTopologicalSort[K comparable, T any](g Graph[K, T], less func(K, K) b
 		if len(predecessors) == 0 {
 			queue = append(queue, vertex)
 			queued[vertex] = struct{}{}
+			delete(predecessorMap, vertex)
 		}
 	}
 
-	order := make([]K, 0, len(predecessorMap))
-	visited := make(map[K]struct{})
-
-	sort.Slice(queue, func(i, j int) bool {
-		return less(queue[i], queue[j])
-	})
-
-	for len(queue) > 0 {
-		currentVertex := queue[0]
-		queue = queue[1:]
-
-		if _, ok := visited[currentVertex]; ok {
-			continue
-		}
-
-		order = append(order, currentVertex)
-		visited[currentVertex] = struct{}{}
-
-		frontier := make([]K, 0)
-
-		for vertex, predecessors := range predecessorMap {
-			delete(predecessors, currentVertex)
-
-			if len(predecessors) != 0 {
-				continue
-			}
-
-			if _, ok := queued[vertex]; ok {
-				continue
-			}
-
-			frontier = append(frontier, vertex)
-			queued[vertex] = struct{}{}
-		}
-
-		sort.Slice(frontier, func(i, j int) bool {
-			return less(frontier[i], frontier[j])
+	if less != nil {
+		sort.Slice(queue, func(i, j int) bool {
+			return less(queue[i], queue[j])
 		})
-
-		queue = append(queue, frontier...)
 	}
 
-	gOrder, err := g.Order()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get graph order: %w", err)
-	}
+	return func(yield func(K, error) bool) {
+		for len(queue) > 0 {
+			currentVertex := queue[0]
+			queue = queue[1:]
 
-	if len(order) != gOrder {
-		return nil, errors.New("topological sort cannot be computed on graph with cycles")
-	}
+			if !yield(currentVertex, nil) {
+				return
+			}
 
-	return order, nil
+			frontier := make([]K, 0)
+
+			for vertex, predecessors := range predecessorMap {
+				delete(predecessors, currentVertex)
+
+				if len(predecessors) != 0 {
+					continue
+				}
+
+				if _, ok := queued[vertex]; ok {
+					continue
+				}
+
+				frontier = append(frontier, vertex)
+				queued[vertex] = struct{}{}
+				// No more predecessors, so we can remove the vertex from the map.
+				// Used for bookkeeping to check for leftover predecessors, indicating
+				// a cycle in the graph.
+				delete(predecessorMap, vertex)
+			}
+
+			if less != nil {
+				sort.Slice(frontier, func(i, j int) bool {
+					return less(frontier[i], frontier[j])
+				})
+			}
+
+			queue = append(queue, frontier...)
+		}
+		if len(predecessorMap) > 0 {
+			var zero K
+			yield(zero, fmt.Errorf("graph contains a cycle"))
+		}
+	}
 }
 
-// TransitiveReduction returns a new graph with the same vertices and the same
-// reachability as the given graph, but with as few edges as possible. The graph
+// TransitiveReduction modifies the graph to have the same vertices and the same
+// reachability, but with as few edges as possible. The graph
 // must be a directed acyclic graph.
 //
 // TransitiveReduction is a very expensive operation scaling with O(V(V+E)).
-func TransitiveReduction[K comparable, T any](g Graph[K, T]) (Graph[K, T], error) {
-	if !g.Traits().IsDirected {
-		return nil, fmt.Errorf("transitive reduction cannot be performed on undirected graph")
-	}
-
-	transitiveReduction, err := g.Clone()
+func TransitiveReduction[K comparable, T any](g Graph[K, T]) error {
+	adjacencyMap, err := AdjacencyMap(g)
 	if err != nil {
-		return nil, fmt.Errorf("failed to clone the graph: %w", err)
-	}
-
-	adjacencyMap, err := transitiveReduction.AdjacencyMap()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get adajcency map: %w", err)
+		return fmt.Errorf("failed to get adajcency map: %w", err)
 	}
 
 	// For each vertex in the graph, run a depth-first search from each direct
@@ -173,9 +108,9 @@ func TransitiveReduction[K comparable, T any](g Graph[K, T]) (Graph[K, T], error
 	// are redundant because their targets apparently are not only reachable
 	// from the top-level vertex, but also through a DFS.
 	for vertex, successors := range adjacencyMap {
-		tOrder, err := transitiveReduction.Order()
+		tOrder, err := g.Order()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get graph order: %w", err)
+			return fmt.Errorf("failed to get graph order: %w", err)
 		}
 
 		for successor := range successors {
@@ -199,13 +134,13 @@ func TransitiveReduction[K comparable, T any](g Graph[K, T]) (Graph[K, T], error
 						if stack.contains(adjacency) {
 							// If the current adjacency is both on the stack and
 							// has already been visited, there is a cycle.
-							return nil, fmt.Errorf("transitive reduction cannot be performed on graph with cycle")
+							return fmt.Errorf("transitive reduction cannot be performed on graph with cycle")
 						}
 						continue
 					}
 
 					if _, ok := adjacencyMap[vertex][adjacency]; ok {
-						_ = transitiveReduction.RemoveEdge(vertex, adjacency)
+						_ = g.RemoveEdge(vertex, adjacency)
 					}
 					stack.push(adjacency)
 				}
@@ -213,5 +148,5 @@ func TransitiveReduction[K comparable, T any](g Graph[K, T]) (Graph[K, T], error
 		}
 	}
 
-	return transitiveReduction, nil
+	return nil
 }

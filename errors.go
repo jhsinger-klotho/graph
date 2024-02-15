@@ -8,7 +8,7 @@ import (
 type (
 	VertexAlreadyExistsError[K comparable, T any] struct {
 		Key           K
-		ExistingValue T
+		ExistingValue Vertex[T]
 	}
 
 	VertexNotFoundError[K comparable] struct {
@@ -30,6 +30,10 @@ type (
 
 	EdgeCausesCycleError[K comparable] struct {
 		Source, Target K
+	}
+
+	UpdateChangedKeyError[K comparable] struct {
+		OldKey, NewKey K
 	}
 )
 

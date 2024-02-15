@@ -1,6 +1,12 @@
 package graph
 
-import "fmt"
+import (
+	"fmt"
+)
+
+type DFSer[K comparable] interface {
+	DFS(K) func(func(K, error) bool)
+}
 
 // DFS performs a depth-first search on the graph, starting from the given vertex. The visit
 // function will be invoked with the hash of the vertex currently visited. If it returns false, DFS
@@ -32,14 +38,24 @@ import "fmt"
 //	}
 //
 // DFS is non-recursive and maintains a stack instead.
-func DFS[K comparable, T any](g Graph[K, T], start K, visit func(K) bool) error {
-	adjacencyMap, err := g.AdjacencyMap()
+func DFS[K comparable, T any](g Graph[K, T], start K) func(yield func(K, error) bool) {
+	if dfser, ok := g.(DFSer[K]); ok {
+		return dfser.DFS(start)
+	}
+
+	adjacencyMap, err := AdjacencyMap[K, T](g)
 	if err != nil {
-		return fmt.Errorf("could not get adjacency map: %w", err)
+		return func(yield func(K, error) bool) {
+			var zeroKey K
+			yield(zeroKey, fmt.Errorf("could not get adjacency map: %w", err))
+		}
 	}
 
 	if _, ok := adjacencyMap[start]; !ok {
-		return fmt.Errorf("could not find start vertex with hash %v", start)
+		return func(yield func(K, error) bool) {
+			var zeroKey K
+			yield(zeroKey, fmt.Errorf("could not find start vertex with hash %v", start))
+		}
 	}
 
 	stack := newStack[K]()
@@ -47,23 +63,69 @@ func DFS[K comparable, T any](g Graph[K, T], start K, visit func(K) bool) error 
 
 	stack.push(start)
 
-	for !stack.isEmpty() {
-		currentHash, _ := stack.pop()
+	return func(yield func(K, error) bool) {
+		for !stack.isEmpty() {
+			currentHash, _ := stack.pop()
 
-		if _, ok := visited[currentHash]; !ok {
-			// Stop traversing the graph if the visit function returns true.
-			if stop := visit(currentHash); stop {
-				break
-			}
-			visited[currentHash] = true
+			if _, ok := visited[currentHash]; !ok {
+				// Stop traversing the graph if the visit function returns true.
+				if !yield(currentHash, nil) {
+					break
+				}
+				visited[currentHash] = true
 
-			for adjacency := range adjacencyMap[currentHash] {
-				stack.push(adjacency)
+				for adjacency := range adjacencyMap[currentHash] {
+					stack.push(adjacency)
+				}
 			}
 		}
 	}
+}
 
-	return nil
+func PathsFrom[K comparable](adjacencyMap map[K]map[K]Edge[K], start K) func(yield func(Path[K]) bool) {
+	var queue []Path[K]
+	enqueue := func(current Path[K], next K) {
+		if current.Contains(next) {
+			// Prevent loops
+			return
+		}
+		// make a new slice because `append` won't copy if there's capacity
+		// which causes the latest `append` to overwrite the last element of any previous appends
+		// (as happens when appending in a loop as we do below).
+		//   x := make([]int, 2, 3); x[0] = 1; x[1] = 2
+		//   y := append(x, 3)
+		//   z := append(x, 4)
+		//   fmt.Println(y) // [1 2 4] !!
+		nextPath := make(Path[K], len(current)+1)
+		copy(nextPath, current)
+		nextPath[len(nextPath)-1] = next
+		queue = append(queue, nextPath)
+	}
+
+	startPath := Path[K]{start}
+	for d := range adjacencyMap[start] {
+		enqueue(startPath, d)
+	}
+
+	return func(yield func(Path[K]) bool) {
+		var current Path[K]
+		for len(queue) > 0 {
+			current, queue = queue[0], queue[1:]
+
+			if !yield(current) {
+				break
+			}
+
+			last := current[len(current)-1]
+			for d := range adjacencyMap[last] {
+				enqueue(current, d)
+			}
+		}
+	}
+}
+
+type BFSer[K comparable] interface {
+	BFS(K) func(func(K, error) bool)
 }
 
 // BFS performs a breadth-first search on the graph, starting from the given vertex. The visit
@@ -96,32 +158,24 @@ func DFS[K comparable, T any](g Graph[K, T], start K, visit func(K) bool) error 
 //	}
 //
 // BFS is non-recursive and maintains a stack instead.
-func BFS[K comparable, T any](g Graph[K, T], start K, visit func(K) bool) error {
-	ignoreDepth := func(vertex K, _ int) bool {
-		return visit(vertex)
+func BFS[K comparable, T any](g Graph[K, T], start K) func(yield func(K, error) bool) {
+	if bfser, ok := g.(BFSer[K]); ok {
+		return bfser.BFS(start)
 	}
-	return BFSWithDepth(g, start, ignoreDepth)
-}
 
-// BFSWithDepth works just as BFS and performs a breadth-first search on the graph, but its
-// visit function is passed the current depth level as a second argument. Consequently, the
-// current depth can be used for deciding whether or not to proceed past a certain depth.
-//
-//	_ = graph.BFSWithDepth(g, 1, func(value int, depth int) bool {
-//		fmt.Println(value)
-//		return depth > 3
-//	})
-//
-// With the visit function from the example, the BFS traversal will stop once a depth greater
-// than 3 is reached.
-func BFSWithDepth[K comparable, T any](g Graph[K, T], start K, visit func(K, int) bool) error {
-	adjacencyMap, err := g.AdjacencyMap()
+	adjacencyMap, err := AdjacencyMap[K, T](g)
 	if err != nil {
-		return fmt.Errorf("could not get adjacency map: %w", err)
+		return func(yield func(K, error) bool) {
+			var zeroKey K
+			yield(zeroKey, fmt.Errorf("could not get adjacency map: %w", err))
+		}
 	}
 
 	if _, ok := adjacencyMap[start]; !ok {
-		return fmt.Errorf("could not find start vertex with hash %v", start)
+		return func(yield func(K, error) bool) {
+			var zeroKey K
+			yield(zeroKey, fmt.Errorf("could not find start vertex with hash %v", start))
+		}
 	}
 
 	queue := make([]K, 0)
@@ -129,27 +183,24 @@ func BFSWithDepth[K comparable, T any](g Graph[K, T], start K, visit func(K, int
 
 	visited[start] = true
 	queue = append(queue, start)
-	depth := 0
 
-	for len(queue) > 0 {
-		currentHash := queue[0]
+	return func(yield func(K, error) bool) {
+		for len(queue) > 0 {
+			currentHash := queue[0]
 
-		queue = queue[1:]
-		depth++
+			queue = queue[1:]
 
-		// Stop traversing the graph if the visit function returns true.
-		if stop := visit(currentHash, depth); stop {
-			break
-		}
-
-		for adjacency := range adjacencyMap[currentHash] {
-			if _, ok := visited[adjacency]; !ok {
-				visited[adjacency] = true
-				queue = append(queue, adjacency)
+			if !yield(currentHash, nil) {
+				break
 			}
+
+			for adjacency := range adjacencyMap[currentHash] {
+				if _, ok := visited[adjacency]; !ok {
+					visited[adjacency] = true
+					queue = append(queue, adjacency)
+				}
+			}
+
 		}
-
 	}
-
-	return nil
 }
