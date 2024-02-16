@@ -61,6 +61,10 @@ func (e *EdgeCausesCycleError[K]) Error() string {
 	return fmt.Sprintf("edge %v - %v would cause a cycle", e.Source, e.Target)
 }
 
+func (e *UpdateChangedKeyError[K]) Error() string {
+	return fmt.Sprintf("vertex key changed from %v to %v", e.OldKey, e.NewKey)
+}
+
 var (
 	ErrVertexNotFound      = errors.New("vertex not found")
 	ErrVertexAlreadyExists = errors.New("vertex already exists")

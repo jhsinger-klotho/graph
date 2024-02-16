@@ -67,17 +67,8 @@ func TestUndirectedMinimumSpanningTree(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			g := NewMemoryUndirected(StringHash)
-
-			for _, vertex := range test.vertices {
-				_ = g.AddVertex(vertex)
-			}
-
-			for _, edge := range test.edges {
-				_ = g.AddEdge(EdgeCopy(edge))
-			}
-
-			mst := NewMemoryUndirected(StringHash)
+			g := newStringUndirectedTestGraph(test.vertices, test.edges)
+			mst := newStringUndirectedTestGraph(nil, nil)
 
 			_ = MinimumSpanningTree(g, mst)
 			adjacencyMap, _ := mst.AdjacencyMap()
@@ -152,17 +143,9 @@ func TestUndirectedMaximumSpanningTree(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			g := NewMemoryUndirected(StringHash)
+			g := newStringUndirectedTestGraph(test.vertices, test.edges)
+			mst := newStringUndirectedTestGraph(nil, nil)
 
-			for _, vertex := range test.vertices {
-				_ = g.AddVertex(vertex)
-			}
-
-			for _, edge := range test.edges {
-				_ = g.AddEdge(EdgeCopy(edge))
-			}
-
-			mst := NewMemoryUndirected(StringHash)
 			_ = MaximumSpanningTree(g, mst)
 			adjacencyMap, _ := mst.AdjacencyMap()
 
@@ -238,4 +221,17 @@ func mapToString(m map[string]map[string]Edge[string]) string {
 	}
 	sb.WriteString("}")
 	return sb.String()
+}
+
+func newStringUndirectedTestGraph(vertices []string, edges []Edge[string]) *memoryGraph[string, string] {
+	g := NewMemoryGraph(StringHash)
+
+	for _, vertex := range vertices {
+		_ = g.AddVertex(vertex)
+	}
+
+	for _, edge := range edges {
+		_ = g.AddEdge(EdgeCopy(edge))
+	}
+	return g
 }

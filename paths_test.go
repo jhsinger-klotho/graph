@@ -7,6 +7,10 @@ import (
 )
 
 func TestDirectedCreatesCycle(t *testing.T) {
+	// A wrapper type to passthrough read operations, but not other methods (to skip the interface check for custom impl)
+	type RO struct {
+		GraphRead[int, int]
+	}
 	tests := map[string]struct {
 		vertices     []int
 		edges        []Edge[int]
@@ -60,9 +64,81 @@ func TestDirectedCreatesCycle(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := newTestGraph(test.vertices, test.edges)
+		graph := RO{GraphRead: newTestGraph(test.vertices, test.edges)}
 
 		createsCycle, err := CreatesCycle[int, int](graph, test.sourceHash, test.targetHash)
+		if err != nil {
+			t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+		}
+
+		if createsCycle != test.createsCycle {
+			t.Errorf("%s: cycle expectancy doesn't match: expected %v, got %v", name, test.createsCycle, createsCycle)
+		}
+	}
+}
+func TestUndirectedCreatesCycle(t *testing.T) {
+	type ReadRelation interface {
+		GraphRead[int, int]
+		GraphRelations[int]
+	}
+	// A wrapper type to passthrough read operations, but not other methods (to skip the interface check for custom impl)
+	type RO struct {
+		ReadRelation
+	}
+	tests := map[string]struct {
+		vertices     []int
+		edges        []Edge[int]
+		sourceHash   int
+		targetHash   int
+		createsCycle bool
+	}{
+		"undirected 2-4-7-5 cycle": {
+			vertices: []int{1, 2, 3, 4, 5, 6, 7},
+			edges: []Edge[int]{
+				{Source: 1, Target: 2},
+				{Source: 1, Target: 3},
+				{Source: 2, Target: 4},
+				{Source: 3, Target: 6},
+				{Source: 4, Target: 7},
+				{Source: 5, Target: 7},
+			},
+			sourceHash:   2,
+			targetHash:   5,
+			createsCycle: true,
+		},
+		"undirected 5-6-3-1-2-7 cycle": {
+			vertices: []int{1, 2, 3, 4, 5, 6, 7},
+			edges: []Edge[int]{
+				{Source: 1, Target: 2},
+				{Source: 1, Target: 3},
+				{Source: 2, Target: 4},
+				{Source: 3, Target: 6},
+				{Source: 4, Target: 7},
+				{Source: 5, Target: 7},
+			},
+			sourceHash:   5,
+			targetHash:   6,
+			createsCycle: true,
+		},
+		"no cycle": {
+			vertices: []int{1, 2, 3, 4, 5, 6, 7},
+			edges: []Edge[int]{
+				{Source: 1, Target: 2},
+				{Source: 1, Target: 3},
+				{Source: 2, Target: 4},
+				{Source: 3, Target: 6},
+				{Source: 4, Target: 7},
+			},
+			sourceHash:   5,
+			targetHash:   7,
+			createsCycle: false,
+		},
+	}
+
+	for name, test := range tests {
+		graph := RO{ReadRelation: newUndirectedTestGraph(test.vertices, test.edges)}
+
+		createsCycle, err := CreatesCycle(graph, test.sourceHash, test.targetHash)
 		if err != nil {
 			t.Fatalf("%s: failed to add edge: %s", name, err.Error())
 		}
@@ -180,17 +256,32 @@ func TestDirectedShortestPath(t *testing.T) {
 			targetHash:           "D",
 			expectedShortestPath: []string{"A", "B", "C", "D"},
 		},
+		"can process negative weights": {
+			vertices: []string{"A", "B", "C", "D", "E"},
+			edges: []Edge[string]{
+				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 1}},
+				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 2}},
+				{Source: "B", Target: "C", Properties: EdgeProperties{Weight: 2}},
+				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
+				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 2}},
+				{Source: "D", Target: "E", Properties: EdgeProperties{Weight: -1}},
+			},
+			isWeighted:           true,
+			sourceHash:           "A",
+			targetHash:           "E",
+			expectedShortestPath: []string{"A", "B", "D", "E"},
+		},
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(StringHash)
+		graph := NewMemoryGraph(StringHash, Directed())
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)
 		}
 
 		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
+			if err := graph.AddEdge(EdgeCopy(edge)); err != nil {
 				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
 			}
 		}
@@ -220,7 +311,6 @@ func TestUndirectedShortestPath(t *testing.T) {
 		sourceHash           string
 		targetHash           string
 		isWeighted           bool
-		isDirected           bool
 		expectedShortestPath []string
 		shouldFail           bool
 	}{
@@ -284,22 +374,6 @@ func TestUndirectedShortestPath(t *testing.T) {
 			targetHash:           "B",
 			expectedShortestPath: []string{"B"},
 		},
-		"can process negative weights": {
-			vertices: []string{"A", "B", "C", "D", "E"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 1}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 2}},
-				{Source: "B", Target: "C", Properties: EdgeProperties{Weight: 2}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 2}},
-				{Source: "D", Target: "E", Properties: EdgeProperties{Weight: -1}},
-			},
-			isWeighted:           true,
-			isDirected:           true,
-			sourceHash:           "A",
-			targetHash:           "E",
-			expectedShortestPath: []string{"A", "B", "D", "E"},
-		},
 		"target not reachable in a disconnected graph": {
 			vertices: []string{"A", "B", "C", "D"},
 			edges: []Edge[string]{
@@ -315,33 +389,35 @@ func TestUndirectedShortestPath(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(StringHash)
+		t.Run(name, func(t *testing.T) {
+			graph := NewMemoryGraph(StringHash)
 
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+			for _, vertex := range test.vertices {
+				_ = graph.AddVertex(vertex)
 			}
-		}
 
-		shortestPath, err := ShortestPath[string, string](graph, test.sourceHash, test.targetHash)
-
-		if test.shouldFail != (err != nil) {
-			t.Fatalf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, (err != nil), err)
-		}
-
-		if len(shortestPath) != len(test.expectedShortestPath) {
-			t.Fatalf("%s: path length expectancy doesn't match: expected %v, got %v", name, len(test.expectedShortestPath), len(shortestPath))
-		}
-
-		for i, expectedVertex := range test.expectedShortestPath {
-			if shortestPath[i] != expectedVertex {
-				t.Errorf("%s: path vertex expectancy doesn't match: expected %v at index %d, got %v", name, expectedVertex, i, shortestPath[i])
+			for _, edge := range test.edges {
+				if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
+					t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+				}
 			}
-		}
+
+			shortestPath, err := ShortestPath[string, string](graph, test.sourceHash, test.targetHash)
+
+			if test.shouldFail != (err != nil) {
+				t.Fatalf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, (err != nil), err)
+			}
+
+			if len(shortestPath) != len(test.expectedShortestPath) {
+				t.Fatalf("%s: path length expectancy doesn't match: expected %v, got %v", name, len(test.expectedShortestPath), len(shortestPath))
+			}
+
+			for i, expectedVertex := range test.expectedShortestPath {
+				if shortestPath[i] != expectedVertex {
+					t.Errorf("%s: path vertex expectancy doesn't match: expected %v at index %d, got %v", name, expectedVertex, i, shortestPath[i])
+				}
+			}
+		})
 	}
 }
 
@@ -483,33 +559,35 @@ func Test_BellmanFord(t *testing.T) {
 		},
 	}
 	for name, test := range tests {
-		graph := NewMemoryGraph(StringHash)
+		t.Run(name, func(t *testing.T) {
+			graph := NewMemoryGraph(StringHash, Directed())
 
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+			for _, vertex := range test.vertices {
+				_ = graph.AddVertex(vertex)
 			}
-		}
 
-		shortestPath, err := BellmanFordShortestPath[string, string](graph, test.sourceHash, nil).ShortestPath(test.targetHash)
-
-		if test.shouldFail != (err != nil) {
-			t.Fatalf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, (err != nil), err)
-		}
-
-		if len(shortestPath) != len(test.expectedShortestPath) {
-			t.Fatalf("%s: path length expectancy doesn't match: expected %v, got %v", name, len(test.expectedShortestPath), len(shortestPath))
-		}
-
-		for i, expectedVertex := range test.expectedShortestPath {
-			if shortestPath[i] != expectedVertex {
-				t.Errorf("%s: path vertex expectancy doesn't match: expected %v at index %d, got %v", name, expectedVertex, i, shortestPath[i])
+			for _, edge := range test.edges {
+				if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
+					t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+				}
 			}
-		}
+
+			shortestPath, err := BellmanFordShortestPath[string, string](graph, test.sourceHash, nil).ShortestPath(test.targetHash)
+
+			if test.shouldFail != (err != nil) {
+				t.Fatalf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, (err != nil), err)
+			}
+
+			if len(shortestPath) != len(test.expectedShortestPath) {
+				t.Fatalf("%s: path length expectancy doesn't match: expected %v, got %v", name, len(test.expectedShortestPath), len(shortestPath))
+			}
+
+			for i, expectedVertex := range test.expectedShortestPath {
+				if shortestPath[i] != expectedVertex {
+					t.Errorf("%s: path vertex expectancy doesn't match: expected %v at index %d, got %v", name, expectedVertex, i, shortestPath[i])
+				}
+			}
+		})
 	}
 }
 
@@ -578,7 +656,7 @@ func TestAllPathsBetween(t *testing.T) {
 			name: "directed",
 			args: args[int, int]{
 				g: func() Graph[int, int] {
-					g := NewMemoryGraph(IntHash)
+					g := NewMemoryGraph(IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
 					}
@@ -608,10 +686,46 @@ func TestAllPathsBetween(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "directed with cycle",
+			name: "undirected",
 			args: args[int, int]{
 				g: func() Graph[int, int] {
 					g := NewMemoryGraph(IntHash)
+					for i := 0; i <= 8; i++ {
+						_ = g.AddVertex(i)
+					}
+					_ = g.AddEdge(0, 1)
+					_ = g.AddEdge(0, 2)
+					_ = g.AddEdge(1, 3)
+					_ = g.AddEdge(1, 4)
+					_ = g.AddEdge(2, 5)
+					_ = g.AddEdge(2, 6)
+					_ = g.AddEdge(3, 7)
+					_ = g.AddEdge(4, 5)
+					_ = g.AddEdge(4, 7)
+					_ = g.AddEdge(5, 6)
+					_ = g.AddEdge(6, 8)
+					return g
+				}(),
+				start: 3,
+				end:   6,
+			},
+			want: [][]int{
+				{3, 1, 0, 2, 6},
+				{3, 1, 0, 2, 5, 6},
+				{3, 1, 4, 5, 6},
+				{3, 1, 4, 5, 2, 6},
+				{3, 7, 4, 5, 2, 6},
+				{3, 7, 4, 5, 6},
+				{3, 7, 4, 1, 0, 2, 6},
+				{3, 7, 4, 1, 0, 2, 5, 6},
+			},
+			wantErr: false,
+		},
+		{
+			name: "directed with cycle",
+			args: args[int, int]{
+				g: func() Graph[int, int] {
+					g := NewMemoryGraph(IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
 					}
@@ -635,7 +749,7 @@ func TestAllPathsBetween(t *testing.T) {
 			name: "directed with self cycle",
 			args: args[int, int]{
 				g: func() Graph[int, int] {
-					g := NewMemoryGraph(IntHash)
+					g := NewMemoryGraph(IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
 					}
@@ -661,7 +775,7 @@ func TestAllPathsBetween(t *testing.T) {
 			name: "directed with unuseable cycle",
 			args: args[int, int]{
 				g: func() Graph[int, int] {
-					g := NewMemoryGraph(IntHash)
+					g := NewMemoryGraph(IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
 					}

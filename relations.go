@@ -25,9 +25,6 @@ type GraphRelations[K comparable] interface {
 //		},
 //	}
 //
-// For an undirected graph, PredecessorMap is the same as AdjacencyMap. This
-// is because there is no distinction between "outgoing" and "ingoing" edges
-// in an undirected graph.
 // If the graph does not implement [GraphRelations], PredecessorMap will be
 // computed from the edges of the graph.
 func PredecessorMap[K comparable, T any](g GraphRead[K, T]) (map[K]map[K]Edge[K], error) {
@@ -74,7 +71,6 @@ func PredecessorMap[K comparable, T any](g GraphRead[K, T]) (map[K]map[K]Edge[K]
 //		"C": map[string]Edge[string]{},
 //	}
 //
-// This design makes AdjacencyMap suitable for a wide variety of algorithms.
 // If the graph does not implement [GraphRelations], AdjacencyMap will be
 // computed from the edges of the graph.
 func AdjacencyMap[K comparable, T any](g GraphRead[K, T]) (map[K]map[K]Edge[K], error) {

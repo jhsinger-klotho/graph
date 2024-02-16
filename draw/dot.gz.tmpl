@@ -1,0 +1,14 @@
+strict {{.GraphType}} {
+{{range $k, $v := .Attributes -}}
+	{{$k}}="{{$v}}";
+{{- end}}
+{{- range $s := .Statements}}
+	"{{.Source}}"
+  {{- if .Target}} {{$.EdgeOperator}} "{{.Target}}" [ {{range $k, $v := .EdgeAttributes -}}{{$k}}="{{$v}}", {{end}} weight={{.EdgeWeight}} ]
+  {{- else }}[ {{range $k, $v := .SourceAttributes}}{{$k}}="{{$v}}", {{end}} weight={{.SourceWeight}} ]
+  {{- end}};
+{{- end}}
+{{- range $s := .ExtraStatements}}
+	{{$s}}
+{{- end}}
+}

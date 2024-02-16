@@ -37,7 +37,7 @@ func TestDirectedTopologicalSort(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(IntHash)
+		graph := NewMemoryGraph(IntHash, Directed())
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)
@@ -126,7 +126,7 @@ func TestDirectedStableTopologicalSort(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(IntHash)
+		graph := NewMemoryGraph(IntHash, Directed())
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)
@@ -247,7 +247,7 @@ func TestDirectedTransitiveReduction(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(StringHash)
+		graph := NewMemoryGraph(StringHash, Directed())
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)

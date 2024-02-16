@@ -49,7 +49,10 @@
 // For detailed usage examples, take a look at the README.
 package graph
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Graph represents a generic graph data structure consisting of vertices of
 // type T identified by a hash of type K.
@@ -61,6 +64,7 @@ type (
 
 	GraphRead[K comparable, T any] interface {
 		Hash(T) K
+		Traits() Traits
 
 		// Vertex returns the vertex with the given hash or ErrVertexNotFound if it
 		// doesn't exist.
@@ -96,6 +100,7 @@ type (
 		//
 		AddVertex(value T, options ...func(*VertexProperties)) error
 
+		// UpdateVertex updates the vertex with the given hash value.
 		UpdateVertex(hash K, options ...func(*Vertex[T])) error
 
 		// RemoveVertex removes the vertex with the given hash value from the graph.
@@ -130,10 +135,6 @@ type (
 		// setting the weight of an edge (A,B) to 10 would look as follows:
 		//
 		//	_ = g.UpdateEdge("A", "B", graph.EdgeWeight(10))
-		//
-		// Removing a particular edge attribute is not possible at the moment. A
-		// workaround is to create a new map without the respective element and
-		// overwrite the existing attributes using the EdgeAttributes option.
 		UpdateEdge(source, target K, options ...func(properties *EdgeProperties)) error
 
 		// RemoveEdge removes the edge between the given source and target vertices.
@@ -144,11 +145,6 @@ type (
 	Vertex[T any] struct {
 		Value      T
 		Properties VertexProperties
-	}
-
-	EdgeKey[K comparable] struct {
-		Source K
-		Target K
 	}
 
 	// Edge represents an edge that joins two vertices. Even though these edges are
@@ -377,4 +373,32 @@ func EdgeT[K comparable, T any](g GraphRead[K, T], source, target K) (Edge[T], e
 		Target:     targetV.Value,
 		Properties: e.Properties,
 	}, nil
+}
+
+func KeysToString[K comparable, T any](g GraphRead[K, T]) (string, error) {
+	adj, err := AdjacencyMap(g)
+	if err != nil {
+		return "", err
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString("{")
+	for src, v := range adj {
+		if len(v) == 0 {
+			comma := ""
+			if sb.Len() > 1 {
+				comma = ", "
+			}
+			fmt.Fprintf(&sb, "%s%v", comma, src)
+		}
+		for trg := range v {
+			comma := ""
+			if sb.Len() > 1 {
+				comma = ", "
+			}
+			fmt.Fprintf(&sb, "%s%v -> %v", comma, src, trg)
+		}
+	}
+	sb.WriteString("}")
+	return sb.String(), nil
 }

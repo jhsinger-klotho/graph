@@ -35,7 +35,7 @@ func TestDirected_AddVertex(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(IntHash)
+		graph := newTestGraph(nil, nil)
 
 		var err error
 
@@ -111,11 +111,7 @@ func TestDirected_Vertex(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(IntHash)
-
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
+		graph := newTestGraph(test.vertices, nil)
 
 		vertex, err := graph.Vertex(test.vertex)
 
@@ -165,15 +161,7 @@ func TestDirected_RemoveVertex(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(IntHash)
-
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			_ = graph.AddEdge(edge.Source, edge.Target)
-		}
+		graph := newTestGraph(test.vertices, test.edges)
 
 		err := graph.RemoveVertex(test.vertex)
 
@@ -269,11 +257,8 @@ func TestDirected_AddEdge(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(IntHash)
-
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
+		// Note: don't pass edges here because we want to capture the error when it's added
+		graph := newTestGraph(test.vertices, nil)
 
 		var err error
 
@@ -449,17 +434,22 @@ func TestDirected_Edges(t *testing.T) {
 		},
 	}
 
+	type EdgeKey struct {
+		S int
+		T int
+	}
+
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			g := newTestGraph(test.vertices, test.edges)
 
-			edges := make(map[EdgeKey[int]]Edge[int])
+			edges := make(map[EdgeKey]Edge[int])
 			for e, _ := range g.Edges() {
-				edges[EdgeKey[int]{Source: e.Source, Target: e.Target}] = e
+				edges[EdgeKey{S: e.Source, T: e.Target}] = e
 			}
 
 			for _, expectedEdge := range test.expectedEdges {
-				actualEdge := edges[EdgeKey[int]{Source: expectedEdge.Source, Target: expectedEdge.Target}]
+				actualEdge := edges[EdgeKey{S: expectedEdge.Source, T: expectedEdge.Target}]
 				if !edgesAreEqual(expectedEdge, actualEdge, true) {
 					t.Errorf("%s: expected edge %v, got %v", name, expectedEdge, actualEdge)
 				}
@@ -943,14 +933,14 @@ func predecessors[K comparable](g GraphRelations[K], vertexHash K) ([]K, error) 
 }
 
 func newTestGraph(vertices []int, edges []Edge[int]) *memoryGraph[int, int] {
-	g := NewMemoryGraph(IntHash)
+	g := NewMemoryGraph(IntHash, Directed())
 
 	for _, vertex := range vertices {
 		_ = g.AddVertex(vertex)
 	}
 
 	for _, edge := range edges {
-		_ = g.AddEdge(edge.Source, edge.Target, EdgeCopyProperties(edge.Properties))
+		_ = g.AddEdge(EdgeCopy(edge))
 	}
 	return g
 }

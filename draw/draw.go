@@ -4,6 +4,7 @@
 package draw
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"text/template"
@@ -12,18 +13,9 @@ import (
 )
 
 // ToDo: This template should be simplified and split into multiple templates.
-const dotTemplate = `strict {{.GraphType}} {
-{{range $k, $v := .Attributes -}}
-	{{$k}}="{{$v}}";
-{{- end}}
-{{- range $s := .Statements}}
-	"{{.Source}}" {{if .Target}}{{$.EdgeOperator}} "{{.Target}}" [ {{range $k, $v := .EdgeAttributes}}{{$k}}="{{$v}}", {{end}} weight={{.EdgeWeight}} ]{{else}}[ {{range $k, $v := .SourceAttributes}}{{$k}}="{{$v}}", {{end}} weight={{.SourceWeight}} ]{{end}};
-{{- end}}
-{{- range $s := .ExtraStatements}}
-	{{$s}}
-{{- end}}
-}
-`
+//
+//go:embed dot.gz.tmpl
+var dotTemplate string
 
 type Description struct {
 	GraphType       string
@@ -90,19 +82,16 @@ func GraphAttribute(key, value string) func(*Description) {
 	}
 }
 
-func DirectedGraph() func(*Description) {
-	return func(d *Description) {
-		d.GraphType = "digraph"
-		d.EdgeOperator = "->"
-	}
-}
-
 func generateDOT[K comparable, T any](g graph.GraphRead[K, T], options ...func(*Description)) (Description, error) {
 	desc := Description{
 		GraphType:    "graph",
 		Attributes:   make(map[string]string),
 		EdgeOperator: "--",
 		Statements:   make([]Statement, 0),
+	}
+	if g.Traits().IsDirected {
+		desc.GraphType = "digraph"
+		desc.EdgeOperator = "->"
 	}
 
 	for _, option := range options {
