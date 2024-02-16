@@ -64,16 +64,18 @@ func TestDirectedCreatesCycle(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := RO{GraphRead: newTestGraph(test.vertices, test.edges)}
+		t.Run(name, func(t *testing.T) {
+			graph := RO{GraphRead: newTestGraph(test.vertices, test.edges)}
 
-		createsCycle, err := CreatesCycle[int, int](graph, test.sourceHash, test.targetHash)
-		if err != nil {
-			t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-		}
+			createsCycle, err := CreatesCycle[int, int](graph, test.sourceHash, test.targetHash)
+			if err != nil {
+				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+			}
 
-		if createsCycle != test.createsCycle {
-			t.Errorf("%s: cycle expectancy doesn't match: expected %v, got %v", name, test.createsCycle, createsCycle)
-		}
+			if createsCycle != test.createsCycle {
+				t.Errorf("%s: cycle expectancy doesn't match: expected %v, got %v", name, test.createsCycle, createsCycle)
+			}
+		})
 	}
 }
 func TestUndirectedCreatesCycle(t *testing.T) {
@@ -136,24 +138,26 @@ func TestUndirectedCreatesCycle(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := RO{ReadRelation: newUndirectedTestGraph(test.vertices, test.edges)}
+		t.Run(name, func(t *testing.T) {
+			graph := RO{ReadRelation: newUndirectedTestGraph(test.vertices, test.edges)}
 
-		createsCycle, err := CreatesCycle(graph, test.sourceHash, test.targetHash)
-		if err != nil {
-			t.Fatalf("%s: failed to add edge: %s", name, err.Error())
-		}
+			createsCycle, err := CreatesCycle(graph, test.sourceHash, test.targetHash)
+			if err != nil {
+				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+			}
 
-		if createsCycle != test.createsCycle {
-			t.Errorf("%s: cycle expectancy doesn't match: expected %v, got %v", name, test.createsCycle, createsCycle)
-		}
+			if createsCycle != test.createsCycle {
+				t.Errorf("%s: cycle expectancy doesn't match: expected %v, got %v", name, test.createsCycle, createsCycle)
+			}
+		})
 	}
 }
 
 func TestDirectedShortestPath(t *testing.T) {
 	tests := map[string]struct {
 		vertices             []string
+		vertexWeights        map[string]float64
 		edges                []Edge[string]
-		isWeighted           bool
 		sourceHash           string
 		targetHash           string
 		expectedShortestPath []string
@@ -173,7 +177,6 @@ func TestDirectedShortestPath(t *testing.T) {
 				{Source: "F", Target: "G", Properties: EdgeProperties{Weight: 5}},
 				{Source: "G", Target: "B", Properties: EdgeProperties{Weight: 2}},
 			},
-			isWeighted:           true,
 			sourceHash:           "A",
 			targetHash:           "B",
 			expectedShortestPath: []string{"A", "C", "E", "B"},
@@ -186,7 +189,6 @@ func TestDirectedShortestPath(t *testing.T) {
 				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
 				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 2}},
 			},
-			isWeighted:           true,
 			sourceHash:           "A",
 			targetHash:           "D",
 			expectedShortestPath: []string{"A", "B", "D"},
@@ -214,7 +216,6 @@ func TestDirectedShortestPath(t *testing.T) {
 				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
 				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 2}},
 			},
-			isWeighted:           true,
 			sourceHash:           "B",
 			targetHash:           "B",
 			expectedShortestPath: []string{"B"},
@@ -225,7 +226,6 @@ func TestDirectedShortestPath(t *testing.T) {
 				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
 				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
 			},
-			isWeighted:           true,
 			sourceHash:           "A",
 			targetHash:           "D",
 			expectedShortestPath: []string{},
@@ -251,7 +251,6 @@ func TestDirectedShortestPath(t *testing.T) {
 				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 5}},
 				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 1}},
 			},
-			isWeighted:           true,
 			sourceHash:           "A",
 			targetHash:           "D",
 			expectedShortestPath: []string{"A", "B", "C", "D"},
@@ -266,41 +265,92 @@ func TestDirectedShortestPath(t *testing.T) {
 				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 2}},
 				{Source: "D", Target: "E", Properties: EdgeProperties{Weight: -1}},
 			},
-			isWeighted:           true,
 			sourceHash:           "A",
 			targetHash:           "E",
 			expectedShortestPath: []string{"A", "B", "D", "E"},
 		},
+		"vertex weights": {
+			vertices: []string{"A", "B", "C", "D"},
+			vertexWeights: map[string]float64{
+				"A": 0,
+				"B": 1,
+				"C": 2,
+				"D": 0,
+			},
+			edges: []Edge[string]{
+				{Source: "A", Target: "B"},
+				{Source: "A", Target: "C"},
+				{Source: "B", Target: "D"},
+				{Source: "C", Target: "D"},
+			},
+			sourceHash:           "A",
+			targetHash:           "D",
+			expectedShortestPath: []string{"A", "B", "D"},
+		},
+		"vertex and edge weights": {
+			// like the img/dijkstra.svg graph, but with vertex weights to make the shortest path different
+			vertices: []string{"A", "B", "C", "D", "E", "F", "G"},
+			edges: []Edge[string]{
+				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 3}},
+				{Source: "A", Target: "F", Properties: EdgeProperties{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 4}},
+				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 1}},
+				{Source: "C", Target: "F", Properties: EdgeProperties{Weight: 2}},
+				{Source: "D", Target: "B", Properties: EdgeProperties{Weight: 1}},
+				{Source: "E", Target: "B", Properties: EdgeProperties{Weight: 2}},
+				{Source: "E", Target: "F", Properties: EdgeProperties{Weight: 3}},
+				{Source: "F", Target: "G", Properties: EdgeProperties{Weight: 5}},
+				{Source: "G", Target: "B", Properties: EdgeProperties{Weight: 2}},
+			},
+			vertexWeights: map[string]float64{
+				"A": 1,
+				"B": 1,
+				"C": 1,
+				"D": 1,
+				"E": 10,
+				"F": 1,
+				"G": 1,
+			},
+			sourceHash:           "A",
+			targetHash:           "B",
+			expectedShortestPath: []string{"A", "C", "D", "B"},
+		},
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(StringHash, Directed())
+		t.Run(name, func(t *testing.T) {
+			graph := NewMemoryGraph(StringHash, Directed())
 
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(EdgeCopy(edge)); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+			for _, vertex := range test.vertices {
+				if w, ok := test.vertexWeights[vertex]; ok {
+					_ = graph.AddVertex(vertex, VertexWeight(w))
+				} else {
+					_ = graph.AddVertex(vertex)
+				}
 			}
-		}
 
-		shortestPath, err := ShortestPath[string, string](graph, test.sourceHash, test.targetHash)
-
-		if test.shouldFail != (err != nil) {
-			t.Fatalf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, (err != nil), err)
-		}
-
-		if len(shortestPath) != len(test.expectedShortestPath) {
-			t.Fatalf("%s: path length expectancy doesn't match: expected %v, got %v", name, len(test.expectedShortestPath), len(shortestPath))
-		}
-
-		for i, expectedVertex := range test.expectedShortestPath {
-			if shortestPath[i] != expectedVertex {
-				t.Errorf("%s: path vertex expectancy doesn't match: expected %v at index %d, got %v", name, expectedVertex, i, shortestPath[i])
+			for _, edge := range test.edges {
+				if err := graph.AddEdge(EdgeCopy(edge)); err != nil {
+					t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+				}
 			}
-		}
+
+			shortestPath, err := ShortestPath[string, string](graph, test.sourceHash, test.targetHash)
+
+			if test.shouldFail != (err != nil) {
+				t.Fatalf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, (err != nil), err)
+			}
+
+			if len(shortestPath) != len(test.expectedShortestPath) {
+				t.Fatalf("%s: path length expectancy doesn't match: expected %v, got %v", name, len(test.expectedShortestPath), len(shortestPath))
+			}
+
+			for i, expectedVertex := range test.expectedShortestPath {
+				if shortestPath[i] != expectedVertex {
+					t.Errorf("%s: path vertex expectancy doesn't match: expected %v at index %d, got %v", name, expectedVertex, i, shortestPath[i])
+				}
+			}
+		})
 	}
 }
 
@@ -620,22 +670,24 @@ func TestDirectedStronglyConnectedComponents(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := newTestGraph(test.vertices, test.edges)
+		t.Run(name, func(t *testing.T) {
+			graph := newTestGraph(test.vertices, test.edges)
 
-		sccs, _ := StronglyConnectedComponents[int, int](graph)
-		matchedSCCs := 0
+			sccs, _ := StronglyConnectedComponents[int, int](graph)
+			matchedSCCs := 0
 
-		for _, scc := range sccs {
-			for _, expectedSCC := range test.expectedSCCs {
-				if slicesAreEqual(scc, expectedSCC) {
-					matchedSCCs++
+			for _, scc := range sccs {
+				for _, expectedSCC := range test.expectedSCCs {
+					if slicesAreEqual(scc, expectedSCC) {
+						matchedSCCs++
+					}
 				}
 			}
-		}
 
-		if matchedSCCs != len(test.expectedSCCs) {
-			t.Errorf("%s: expected SCCs don't match: expected %v, got %v", name, test.expectedSCCs, sccs)
-		}
+			if matchedSCCs != len(test.expectedSCCs) {
+				t.Errorf("%s: expected SCCs don't match: expected %v, got %v", name, test.expectedSCCs, sccs)
+			}
+		})
 	}
 }
 

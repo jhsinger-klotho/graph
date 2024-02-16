@@ -47,7 +47,7 @@ func TestIntHash(t *testing.T) {
 func TestEdgeWeight(t *testing.T) {
 	tests := map[string]struct {
 		expected EdgeProperties
-		weight   int
+		weight   float64
 	}{
 		"weight 4": {
 			weight: 4,

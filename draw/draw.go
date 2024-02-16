@@ -28,9 +28,9 @@ type Description struct {
 type Statement struct {
 	Source           interface{}
 	Target           interface{}
-	SourceWeight     int
+	SourceWeight     float64
 	SourceAttributes map[string]string
-	EdgeWeight       int
+	EdgeWeight       float64
 	EdgeAttributes   map[string]string
 }
 

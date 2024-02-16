@@ -135,8 +135,12 @@ func (s *memoryGraph[K, T]) AddVertex(value T, options ...func(*VertexProperties
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.vertices[k]; ok {
-		return &VertexAlreadyExistsError[K, T]{Key: k, ExistingValue: *s.vertices[k]}
+	if !s.traits.IsVerticesWeighted && v.Properties.Weight != 0 {
+		s.traits.IsVerticesWeighted = true
+	}
+
+	if existing, ok := s.vertices[k]; ok {
+		return &VertexAlreadyExistsError[K, T]{Key: k, ExistingValue: *existing}
 	}
 
 	s.vertices[k] = v
@@ -193,6 +197,10 @@ func (s *memoryGraph[K, T]) AddEdge(sourceHash, targetHash K, options ...func(*E
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if !s.traits.IsEdgesWeighted && edge.Properties.Weight != 0 {
+		s.traits.IsEdgesWeighted = true
+	}
 
 	_, ok := s.vertices[sourceHash]
 	if !ok {
@@ -291,7 +299,6 @@ func (s *memoryGraph[K, T]) AdjacencyMap() (map[K]map[K]Edge[K], error) {
 		}
 	}
 	return adj, nil
-
 }
 
 func (s *memoryGraph[K, T]) PredecessorMap() (map[K]map[K]Edge[K], error) {

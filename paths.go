@@ -12,7 +12,9 @@ var ErrTargetNotReachable = errors.New("target vertex not reachable from source"
 
 type Path[K comparable] []K
 
-func PathWeight[K comparable, V any](g Graph[K, V], path Path[K]) (weight int, err error) {
+func PathWeight[K comparable, V any](g Graph[K, V], path Path[K]) (weight float64, err error) {
+	verticesWeighted, edgesWeighted := g.Traits().IsWeighted()
+
 	for i := 1; i < len(path)-1; i++ {
 		var e Edge[K]
 		e, err = g.Edge(path[i-1], path[i])
@@ -20,7 +22,18 @@ func PathWeight[K comparable, V any](g Graph[K, V], path Path[K]) (weight int, e
 			err = fmt.Errorf("edge(path[%d], path[%d]): %w", i-1, i, err)
 			return
 		}
-		weight += e.Properties.Weight
+		if edgesWeighted {
+			weight += e.Properties.Weight
+		} else {
+			weight += 1
+		}
+		if verticesWeighted {
+			target, err := g.Vertex(path[i])
+			if err != nil {
+				return 0, fmt.Errorf("vertex(path[%d]): %w", i, err)
+			}
+			weight += target.Properties.Weight
+		}
 	}
 	return
 }
@@ -124,9 +137,6 @@ func (b shortestPathResult[K]) ShortestPath(target K) (Path[K], error) {
 			return nil, ErrTargetNotReachable
 		}
 		path = append(path, current)
-		if len(path) > 20 {
-			fmt.Print("")
-		}
 		current = next
 	}
 	path = append(path, b.source)
@@ -160,15 +170,7 @@ func DijkstraShortestPath[K comparable, T any](g GraphRead[K, T], source K) Shor
 		queue.Push(hash, weights[hash])
 	}
 
-	isWeighted := false
-	for _, adj := range adjacencyMap {
-		for _, edge := range adj {
-			if edge.Properties.Weight != 0 {
-				isWeighted = true
-				break
-			}
-		}
-	}
+	verticesWeighted, edgesWeighted := g.Traits().IsWeighted()
 
 	// bestPredecessors stores the cheapest or least-weighted predecessor for
 	// each vertex. Given an edge AC with weight=4 and an edge BC with weight=2,
@@ -180,16 +182,24 @@ func DijkstraShortestPath[K comparable, T any](g GraphRead[K, T], source K) Shor
 		hasInfiniteWeight := math.IsInf(weights[vertex], 1)
 
 		for adjacency, edge := range adjacencyMap[vertex] {
-			edgeWeight := edge.Properties.Weight
+			weight := edge.Properties.Weight
 
 			// Setting the weight to 1 is required for unweighted graphs whose
 			// edge weights are 0. Otherwise, all paths would have a sum of 0
 			// and a random path would be returned.
-			if !isWeighted {
-				edgeWeight = 1
+			if !edgesWeighted {
+				weight = 1
 			}
 
-			weight := weights[vertex] + float64(edgeWeight)
+			weight += weights[vertex]
+
+			if verticesWeighted {
+				adjVertex, err := g.Vertex(adjacency)
+				if err != nil {
+					return errShortestPath[K]{err: fmt.Errorf("could not get vertex to determine weight: %w", err)}
+				}
+				weight += adjVertex.Properties.Weight
+			}
 
 			if weight < weights[adjacency] && !hasInfiniteWeight {
 				weights[adjacency] = weight
@@ -212,7 +222,7 @@ func DijkstraShortestPath[K comparable, T any](g GraphRead[K, T], source K) Shor
 // The returned path includes the source and target vertices. If the target cannot be reached
 // from the source vertex, ErrTargetNotReachable will be returned. If there are multiple shortest
 func BellmanFordShortestPath[K comparable, T any](g GraphRead[K, T], source K, less func(a, b K) bool) ShortestPather[K] {
-	dist := make(map[K]int)
+	dist := make(map[K]float64)
 	bestPredecessors := make(map[K]K)
 
 	adjacencyMap, err := AdjacencyMap[K, T](g)
@@ -231,23 +241,22 @@ func BellmanFordShortestPath[K comparable, T any](g GraphRead[K, T], source K, l
 		})
 	}
 
-	isWeighted := false
-	for _, adj := range adjacencyMap {
-		for _, edge := range adj {
-			if edge.Properties.Weight != 0 {
-				isWeighted = true
-				break
-			}
-		}
-	}
+	verticesWeighted, edgesWeighted := g.Traits().IsWeighted()
 
 	for i := 0; i < len(adjacencyMap)-1; i++ {
 		for _, key := range keys {
 			edges := adjacencyMap[key]
-			for _, edge := range edges {
+			for adj, edge := range edges {
 				weight := edge.Properties.Weight
-				if !isWeighted {
+				if !edgesWeighted {
 					weight = 1
+				}
+				if verticesWeighted {
+					adjVertex, err := g.Vertex(adj)
+					if err != nil {
+						return errShortestPath[K]{err: fmt.Errorf("could not get vertex to determine weight: %w", err)}
+					}
+					weight += adjVertex.Properties.Weight
 				}
 				if newDist := dist[key] + weight; newDist < dist[edge.Target] {
 					dist[edge.Target] = newDist
@@ -258,10 +267,17 @@ func BellmanFordShortestPath[K comparable, T any](g GraphRead[K, T], source K, l
 	}
 
 	for _, edges := range adjacencyMap {
-		for _, edge := range edges {
+		for adj, edge := range edges {
 			weight := edge.Properties.Weight
-			if !isWeighted {
+			if !edgesWeighted {
 				weight = 1
+			}
+			if verticesWeighted {
+				adjVertex, err := g.Vertex(adj)
+				if err != nil {
+					return errShortestPath[K]{err: fmt.Errorf("could not get vertex to determine weight: %w", err)}
+				}
+				weight += adjVertex.Properties.Weight
 			}
 			if newDist := dist[edge.Source] + weight; newDist < dist[edge.Target] {
 				return errShortestPath[K]{err: errors.New("graph contains a negative-weight cycle")}
