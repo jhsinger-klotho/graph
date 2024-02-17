@@ -1,7 +1,6 @@
 package graph
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -25,15 +24,6 @@ func TestDirectedTopologicalSort(t *testing.T) {
 			},
 			expectedOrder: []int{1, 2, 3, 4, 5},
 		},
-		"graph with cycle": {
-			vertices: []int{1, 2, 3},
-			edges: []Edge[int, any]{
-				{Source: 1, Target: 2},
-				{Source: 2, Target: 3},
-				{Source: 3, Target: 1},
-			},
-			shouldFail: true,
-		},
 	}
 
 	for name, test := range tests {
@@ -54,16 +44,8 @@ func TestDirectedTopologicalSort(t *testing.T) {
 			t.Fatalf("%s: failed to get predecessor map: %s", name, err.Error())
 		}
 		var order []int
-		for v, sortErr := range TopologicalSort(pred) {
-			if sortErr != nil {
-				err = sortErr
-				break
-			}
+		for v := range TopologicalSort(pred) {
 			order = append(order, v)
-		}
-
-		if test.shouldFail != (err != nil) {
-			t.Errorf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, err != nil, err)
 		}
 
 		if test.shouldFail {
@@ -121,59 +103,136 @@ func TestDirectedStableTopologicalSort(t *testing.T) {
 				{Source: 2, Target: 3},
 				{Source: 3, Target: 1},
 			},
-			shouldFail: true,
+			expectedOrder: []int{1, 2, 3},
 		},
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph[int, int, any](IntHash, Directed())
+		t.Run(name, func(t *testing.T) {
+			graph := NewMemoryGraph[int, int, any](IntHash, Directed())
 
-		for _, vertex := range test.vertices {
-			_ = graph.AddVertex(vertex)
-		}
-
-		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight[any](edge.Properties.Weight)); err != nil {
-				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+			for _, vertex := range test.vertices {
+				_ = graph.AddVertex(vertex)
 			}
-		}
 
-		pred, err := graph.PredecessorMap()
-		if err != nil {
-			t.Fatalf("%s: failed to get predecessor map: %s", name, err.Error())
-		}
-		less := func(a, b int) bool {
-			return a < b
-		}
-		var order []int
-		for v, sortErr := range StableTopologicalSort(pred, less) {
-			if sortErr != nil {
-				err = sortErr
-				break
+			for _, edge := range test.edges {
+				if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight[any](edge.Properties.Weight)); err != nil {
+					t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+				}
 			}
-			order = append(order, v)
-		}
 
-		if test.shouldFail != (err != nil) {
-			t.Errorf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, err != nil, err)
-		}
-
-		if test.shouldFail {
-			continue
-		}
-
-		if len(order) != len(test.expectedOrder) {
-			t.Errorf("%s: order length expectancy doesn't match: expected %v, got %v", name, len(test.expectedOrder), len(order))
-		}
-
-		fmt.Println("expected", test.expectedOrder)
-		fmt.Println("actual", order)
-
-		for i, expectedVertex := range test.expectedOrder {
-			if expectedVertex != order[i] {
-				t.Errorf("%s: order expectancy doesn't match: expected %v at %d, got %v", name, expectedVertex, i, order[i])
+			pred, err := graph.PredecessorMap()
+			if err != nil {
+				t.Fatalf("%s: failed to get predecessor map: %s", name, err.Error())
 			}
-		}
+			less := func(a, b int) bool {
+				return a < b
+			}
+			var order []int
+			for v := range StableTopologicalSort(pred, less) {
+				order = append(order, v)
+			}
+
+			if test.shouldFail {
+				return
+			}
+
+			if len(order) != len(test.expectedOrder) {
+				t.Errorf("%s: order length expectancy doesn't match: expected %v, got %v", name, len(test.expectedOrder), len(order))
+			}
+
+			for i, expectedVertex := range test.expectedOrder {
+				if expectedVertex != order[i] {
+					t.Errorf("%s: order expectancy doesn't match: expected %v at %d, got %v", name, expectedVertex, i, order[i])
+				}
+			}
+		})
+	}
+}
+
+func TestDirectedReverseStableTopologicalSort(t *testing.T) {
+	tests := map[string]struct {
+		vertices      []int
+		edges         []Edge[int, any]
+		expectedOrder []int
+		shouldFail    bool
+	}{
+		"graph with 5 vertices": {
+			vertices: []int{1, 2, 3, 4, 5},
+			edges: []Edge[int, any]{
+				{Source: 1, Target: 2},
+				{Source: 1, Target: 3},
+				{Source: 2, Target: 3},
+				{Source: 2, Target: 4},
+				{Source: 2, Target: 5},
+				{Source: 3, Target: 4},
+				{Source: 4, Target: 5},
+			},
+			expectedOrder: []int{5, 4, 3, 2, 1},
+		},
+		"graph with many possible topological orders": {
+			vertices: []int{1, 2, 3, 4, 5, 6, 10, 20, 30, 40, 50, 60},
+			edges: []Edge[int, any]{
+				{Source: 1, Target: 10},
+				{Source: 2, Target: 20},
+				{Source: 3, Target: 30},
+				{Source: 4, Target: 40},
+				{Source: 5, Target: 50},
+				{Source: 6, Target: 60},
+			},
+			expectedOrder: []int{60, 50, 40, 30, 20, 10, 6, 5, 4, 3, 2, 1},
+		},
+		"graph with cycle": {
+			vertices: []int{1, 2, 3},
+			edges: []Edge[int, any]{
+				{Source: 1, Target: 2},
+				{Source: 2, Target: 3},
+				{Source: 3, Target: 1},
+			},
+			expectedOrder: []int{3, 2, 1},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			graph := NewMemoryGraph[int, int, any](IntHash, Directed())
+
+			for _, vertex := range test.vertices {
+				_ = graph.AddVertex(vertex)
+			}
+
+			for _, edge := range test.edges {
+				if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight[any](edge.Properties.Weight)); err != nil {
+					t.Fatalf("%s: failed to add edge: %s", name, err.Error())
+				}
+			}
+
+			adj, err := graph.AdjacencyMap()
+			if err != nil {
+				t.Fatalf("%s: failed to get predecessor map: %s", name, err.Error())
+			}
+			less := func(a, b int) bool {
+				return a < b
+			}
+			var order []int
+			for v := range StableTopologicalSort(adj, less) {
+				order = append(order, v)
+			}
+
+			if test.shouldFail {
+				return
+			}
+
+			if len(order) != len(test.expectedOrder) {
+				t.Errorf("%s: order length expectancy doesn't match: expected %v, got %v", name, len(test.expectedOrder), len(order))
+			}
+
+			for i, expectedVertex := range test.expectedOrder {
+				if expectedVertex != order[i] {
+					t.Errorf("%s: order expectancy doesn't match: expected %v at %d, got %v", name, expectedVertex, i, order[i])
+				}
+			}
+		})
 	}
 }
 

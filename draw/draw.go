@@ -104,15 +104,15 @@ func generateDOT[K comparable, V any, E any](g graph.GraphRead[K, V, E], options
 	}
 
 	for sourceK, adjacencies := range adjacencyMap {
-		sourceV, err := g.Vertex(sourceK)
+		_, props, err := g.Vertex(sourceK)
 		if err != nil {
 			return desc, err
 		}
 
 		stmt := Statement{
 			Source:           sourceK,
-			SourceWeight:     sourceV.Properties.Weight,
-			SourceAttributes: sourceV.Properties.Attributes,
+			SourceWeight:     props.Weight,
+			SourceAttributes: props.Attributes,
 		}
 		desc.Statements = append(desc.Statements, stmt)
 

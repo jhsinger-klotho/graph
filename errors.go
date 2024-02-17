@@ -7,16 +7,16 @@ import (
 
 type (
 	VertexAlreadyExistsError[K comparable, T any] struct {
-		Key           K
-		ExistingValue Vertex[T]
+		Key            K
+		ExistingVertex Vertex[T]
 	}
 
 	VertexNotFoundError[K comparable] struct {
 		Key K
 	}
 
-	EdgeAlreadyExistsError[K comparable] struct {
-		Source, Target K
+	EdgeAlreadyExistsError[K comparable, E any] struct {
+		ExistingEdge Edge[K, E]
 	}
 
 	EdgeNotFoundError[K comparable] struct {
@@ -38,15 +38,15 @@ type (
 )
 
 func (e *VertexAlreadyExistsError[K, T]) Error() string {
-	return fmt.Sprintf("vertex %v already exists with value %v", e.Key, e.ExistingValue)
+	return fmt.Sprintf("vertex %v already exists with value %v", e.Key, e.ExistingVertex.Value)
 }
 
 func (e *VertexNotFoundError[K]) Error() string {
 	return fmt.Sprintf("vertex %v not found", e.Key)
 }
 
-func (e *EdgeAlreadyExistsError[K]) Error() string {
-	return fmt.Sprintf("edge %v - %v already exists", e.Source, e.Target)
+func (e *EdgeAlreadyExistsError[K, E]) Error() string {
+	return fmt.Sprintf("edge %v - %v already exists", e.ExistingEdge.Source, e.ExistingEdge.Target)
 }
 
 func (e *EdgeNotFoundError[K]) Error() string {
@@ -76,7 +76,7 @@ var (
 
 func (e *VertexAlreadyExistsError[K, T]) Unwrap() error { return ErrVertexAlreadyExists }
 func (e *VertexNotFoundError[K]) Unwrap() error         { return ErrVertexNotFound }
-func (e *EdgeAlreadyExistsError[K]) Unwrap() error      { return ErrEdgeAlreadyExists }
+func (e *EdgeAlreadyExistsError[K, E]) Unwrap() error   { return ErrEdgeAlreadyExists }
 func (e *EdgeNotFoundError[K]) Unwrap() error           { return ErrEdgeNotFound }
 func (e *VertexHasEdgesError[K]) Unwrap() error         { return ErrVertexHasEdges }
 func (e *EdgeCausesCycleError[K]) Unwrap() error        { return ErrEdgeCreatesCycle }

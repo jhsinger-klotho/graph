@@ -68,7 +68,7 @@ type (
 
 		// Vertex returns the vertex with the given hash or ErrVertexNotFound if it
 		// doesn't exist.
-		Vertex(hash K) (Vertex[V], error)
+		Vertex(hash K) (V, VertexProperties, error)
 
 		// Vertices returns a slice of all vertices in the graph.
 		Vertices() func(yield func(Vertex[V], error) bool)
@@ -185,81 +185,6 @@ type (
 	Hash[K comparable, T any] func(T) K
 )
 
-// StringHash is a hashing function that accepts a string and uses that exact
-// string as a hash value. Using it as Hash will yield a Graph[string, string].
-func StringHash(v string) string {
-	return v
-}
-
-// IntHash is a hashing function that accepts an integer and uses that exact
-// integer as a hash value. Using it as Hash will yield a Graph[int, int].
-func IntHash(v int) int {
-	return v
-}
-
-// EdgeWeight returns a function that sets the weight of an edge to the given
-// weight. This is a functional option for the [graph.Graph.Edge] and
-// [graph.Graph.AddEdge] methods.
-func EdgeWeight[E any](weight float64) func(*EdgeProperties[E]) {
-	return func(e *EdgeProperties[E]) {
-		e.Weight = weight
-	}
-}
-
-// EdgeAttribute returns a function that adds the given key-value pair to the
-// attributes of an edge. This is a functional option for the [graph.Graph.Edge]
-// and [graph.Graph.AddEdge] methods.
-func EdgeAttribute[E any](key, value string) func(*EdgeProperties[E]) {
-	return func(e *EdgeProperties[E]) {
-		if e.Attributes == nil {
-			e.Attributes = make(map[string]string)
-		}
-		e.Attributes[key] = value
-	}
-}
-
-// EdgeAttributes returns a function that sets the given map as the attributes
-// of an edge. This is a functional option for the [graph.Graph.AddEdge] and
-// [graph.Graph.UpdateEdge] methods.
-func EdgeAttributes[E any](attributes map[string]string) func(*EdgeProperties[E]) {
-	return func(e *EdgeProperties[E]) {
-		e.Attributes = attributes
-	}
-}
-
-// EdgeData returns a function that sets the data of an edge to the given value.
-// This is a functional option for the [graph.Graph.Edge] and
-// [graph.Graph.AddEdge] methods.
-func EdgeData[E any](data E) func(*EdgeProperties[E]) {
-	return func(e *EdgeProperties[E]) {
-		e.Data = data
-	}
-}
-
-// EdgeCopyProperties makes a copy (shallow for .Data) of the given properties and returns a
-// 'option'-style function that can be used in the [graph.Graph.AddEdge] and
-// [graph.Graph.UpdateEdge] methods.
-func EdgeCopyProperties[E any](properties EdgeProperties[E]) func(*EdgeProperties[E]) {
-	return func(e *EdgeProperties[E]) {
-		if e.Attributes == nil {
-			e.Attributes = make(map[string]string)
-		}
-		for k, v := range properties.Attributes {
-			e.Attributes[k] = v
-		}
-		e.Weight = properties.Weight
-		e.Data = properties.Data
-	}
-}
-
-// EdgeCopy returns the given edge and a function that can be used to copy
-// which can be used as arguments to [graph.Graph.AddEdge]
-//
-//	err := g.AddEdge(EdgeCopy(e))
-func EdgeCopy[K comparable, E any](e Edge[K, E]) (K, K, func(*EdgeProperties[E])) {
-	return e.Source, e.Target, EdgeCopyProperties(e.Properties)
-}
-
 // VertexProperties represents a set of properties that each vertex has. They
 // can be set when adding a vertex using the corresponding functional options:
 //
@@ -270,62 +195,6 @@ func EdgeCopy[K comparable, E any](e Edge[K, E]) (K, K, func(*EdgeProperties[E])
 type VertexProperties struct {
 	Attributes map[string]string
 	Weight     float64
-}
-
-// VertexWeight returns a function that sets the weight of a vertex to the given
-// weight. This is a functional option for the [graph.Graph.Vertex] and
-// [graph.Graph.AddVertex] methods.
-func VertexWeight(weight float64) func(*VertexProperties) {
-	return func(e *VertexProperties) {
-		e.Weight = weight
-	}
-}
-
-// VertexAttribute returns a function that adds the given key-value pair to the
-// vertex attributes. This is a functional option for the [graph.Graph.Vertex]
-// and [graph.Graph.AddVertex] methods.
-func VertexAttribute(key, value string) func(*VertexProperties) {
-	return func(e *VertexProperties) {
-		if e.Attributes == nil {
-			e.Attributes = make(map[string]string)
-		}
-		e.Attributes[key] = value
-	}
-}
-
-// VertexAttributes returns a function that sets the given map as the attributes
-// of a vertex. This is a functional option for the [graph.Graph.AddVertex] methods.
-func VertexAttributes(attributes map[string]string) func(*VertexProperties) {
-	return func(e *VertexProperties) {
-		e.Attributes = attributes
-	}
-}
-
-// VertexCopyProperties makes a copy of the given properties and returns
-// a 'option'-style function that can be used in the [graph.Graph.AddVertex] and
-// [graph.Graph.UpdateVertex] methods.
-func VertexCopyProperties(properties VertexProperties) func(*VertexProperties) {
-	return func(e *VertexProperties) {
-		if e.Attributes == nil {
-			e.Attributes = make(map[string]string)
-		}
-		for k, v := range properties.Attributes {
-			e.Attributes[k] = v
-		}
-		e.Weight = properties.Weight
-	}
-}
-
-// VertexCopy returns the given vertex and a function that can be used to copy
-// which can be used as arguments to [graph.Graph.AddVertex]
-//
-//	err := g.AddVertex(VertexCopy(v))
-func VertexCopy[T any](v Vertex[T]) (T, func(*VertexProperties)) {
-	return v.Value, VertexCopyProperties(v.Properties)
-}
-
-func EdgesEqual[K comparable, T any, E any](hash Hash[K, T], a, b Edge[T, E]) bool {
-	return hash(a.Source) == hash(b.Source) && hash(a.Target) == hash(b.Target)
 }
 
 func CopyTo[K comparable, T any, E any](from GraphRead[K, T, E], to GraphWrite[K, T, E]) error {
@@ -360,17 +229,17 @@ func EdgeT[K comparable, T any, E any](g GraphRead[K, T, E], source, target K) (
 	if err != nil {
 		return edge, err
 	}
-	sourceV, err := g.Vertex(source)
+	sourceV, _, err := g.Vertex(source)
 	if err != nil {
 		return edge, fmt.Errorf("failed to get source vertex: %w", err)
 	}
-	targetV, err := g.Vertex(target)
+	targetV, _, err := g.Vertex(target)
 	if err != nil {
 		return edge, fmt.Errorf("failed to get target vertex: %w", err)
 	}
 	return Edge[T, E]{
-		Source:     sourceV.Value,
-		Target:     targetV.Value,
+		Source:     sourceV,
+		Target:     targetV,
 		Properties: e.Properties,
 	}, nil
 }

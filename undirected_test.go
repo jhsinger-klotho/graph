@@ -115,7 +115,7 @@ func TestUndirected_Vertex(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			graph := newUndirectedTestGraph(test.vertices, nil)
 
-			vertex, err := graph.Vertex(test.vertex)
+			vertex, _, err := graph.Vertex(test.vertex)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("%s: error expectancy doesn't match: expected %v, got %v", name, test.expectedError, err)
@@ -125,7 +125,7 @@ func TestUndirected_Vertex(t *testing.T) {
 				return
 			}
 
-			if vertex.Value != test.vertex {
+			if vertex != test.vertex {
 				t.Errorf("%s: vertex expectancy doesn't match: expected %v, got %v", name, test.vertex, vertex)
 			}
 		})

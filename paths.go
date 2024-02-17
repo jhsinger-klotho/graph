@@ -6,6 +6,7 @@ import (
 	"math"
 	"slices"
 	"sort"
+	"strings"
 )
 
 var ErrTargetNotReachable = errors.New("target vertex not reachable from source")
@@ -28,11 +29,11 @@ func PathWeight[K comparable, V any, E any](g Graph[K, V, E], path Path[K]) (wei
 			weight += 1
 		}
 		if verticesWeighted {
-			target, err := g.Vertex(path[i])
+			_, props, err := g.Vertex(path[i])
 			if err != nil {
 				return 0, fmt.Errorf("vertex(path[%d]): %w", i, err)
 			}
-			weight += target.Properties.Weight
+			weight += props.Weight
 		}
 	}
 	return
@@ -45,6 +46,14 @@ func (p Path[K]) Contains(k K) bool {
 		}
 	}
 	return false
+}
+
+func (p Path[K]) String() string {
+	parts := make([]string, len(p))
+	for i, elem := range p {
+		parts[i] = fmt.Sprintf("%v", elem)
+	}
+	return strings.Join(parts, " -> ")
 }
 
 // GraphCycles is used for graphs that can provide more efficient
@@ -194,11 +203,11 @@ func DijkstraShortestPath[K comparable, V any, E any](g GraphRead[K, V, E], sour
 			weight += weights[vertex]
 
 			if verticesWeighted {
-				adjVertex, err := g.Vertex(adjacency)
+				_, props, err := g.Vertex(adjacency)
 				if err != nil {
 					return errShortestPath[K]{err: fmt.Errorf("could not get vertex to determine weight: %w", err)}
 				}
-				weight += adjVertex.Properties.Weight
+				weight += props.Weight
 			}
 
 			if weight < weights[adjacency] && !hasInfiniteWeight {
@@ -252,11 +261,11 @@ func BellmanFordShortestPath[K comparable, V any, E any](g GraphRead[K, V, E], s
 					weight = 1
 				}
 				if verticesWeighted {
-					adjVertex, err := g.Vertex(adj)
+					_, props, err := g.Vertex(adj)
 					if err != nil {
 						return errShortestPath[K]{err: fmt.Errorf("could not get vertex to determine weight: %w", err)}
 					}
-					weight += adjVertex.Properties.Weight
+					weight += props.Weight
 				}
 				if newDist := dist[key] + weight; newDist < dist[edge.Target] {
 					dist[edge.Target] = newDist
@@ -273,11 +282,11 @@ func BellmanFordShortestPath[K comparable, V any, E any](g GraphRead[K, V, E], s
 				weight = 1
 			}
 			if verticesWeighted {
-				adjVertex, err := g.Vertex(adj)
+				_, props, err := g.Vertex(adj)
 				if err != nil {
 					return errShortestPath[K]{err: fmt.Errorf("could not get vertex to determine weight: %w", err)}
 				}
-				weight += adjVertex.Properties.Weight
+				weight += props.Weight
 			}
 			if newDist := dist[edge.Source] + weight; newDist < dist[edge.Target] {
 				return errShortestPath[K]{err: errors.New("graph contains a negative-weight cycle")}

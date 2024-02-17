@@ -21,6 +21,8 @@ var (
 	_ Graph[string, string, string]  = (*memoryGraph[string, string, string])(nil)
 	_ GraphRelations[string, string] = (*memoryGraph[string, string, string])(nil)
 	_ GraphCycles[string]            = (*memoryGraph[string, string, string])(nil)
+	_ GraphNeighbors[string, string] = (*memoryGraph[string, string, string])(nil)
+	_ GraphWalker[string, string]    = (*memoryGraph[string, string, string])(nil)
 )
 
 func NewMemoryGraph[K comparable, V any, E any](hash Hash[K, V], options ...func(*Traits)) *memoryGraph[K, V, E] {
@@ -44,14 +46,15 @@ func (s *memoryGraph[K, V, E]) Hash(v V) K {
 	return s.hash(v)
 }
 
-func (s *memoryGraph[K, V, E]) Vertex(hash K) (Vertex[V], error) {
+func (s *memoryGraph[K, V, E]) Vertex(hash K) (V, VertexProperties, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	v := s.vertices[hash]
 	if v == nil {
-		return Vertex[V]{}, &VertexNotFoundError[K]{Key: hash}
+		var zero V
+		return zero, VertexProperties{}, &VertexNotFoundError[K]{Key: hash}
 	}
-	return *v, nil
+	return v.Value, v.Properties, nil
 }
 
 func (s *memoryGraph[K, V, E]) Vertices() func(yield func(Vertex[V], error) bool) {
@@ -140,7 +143,7 @@ func (s *memoryGraph[K, V, E]) AddVertex(value V, options ...func(*VertexPropert
 	}
 
 	if existing, ok := s.vertices[k]; ok {
-		return &VertexAlreadyExistsError[K, V]{Key: k, ExistingValue: *existing}
+		return &VertexAlreadyExistsError[K, V]{Key: k, ExistingVertex: *existing}
 	}
 
 	s.vertices[k] = v
@@ -212,7 +215,7 @@ func (s *memoryGraph[K, V, E]) AddEdge(sourceHash, targetHash K, options ...func
 	}
 
 	if e := s.edge(sourceHash, targetHash); e != nil {
-		return &EdgeAlreadyExistsError[K]{Source: sourceHash, Target: targetHash}
+		return &EdgeAlreadyExistsError[K, E]{ExistingEdge: *e}
 	}
 
 	if s.traits.PreventCycles {
@@ -431,7 +434,7 @@ func (s *memoryGraph[K, V, E]) UpstreamNeighbors(hash K) func(yield func(Edge[K,
 	}
 }
 
-func (s *memoryGraph[K, V, E]) Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(Edge[K, E], Edge[K, E]) bool) error {
+func (s *memoryGraph[K, V, E]) Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(a, b Edge[K, E]) bool) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

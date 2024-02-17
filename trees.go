@@ -33,12 +33,12 @@ func spanningTree[K comparable, V any, E any](g Graph[K, V, E], maximum bool, ms
 	subtrees := newUnionFind[K]()
 
 	for v, adjacencies := range adjacencyMap {
-		vertex, err := g.Vertex(v)
+		value, props, err := g.Vertex(v)
 		if err != nil {
 			return fmt.Errorf("failed to get vertex %v: %w", v, err)
 		}
 
-		err = mst.AddVertex(VertexCopy(vertex))
+		err = mst.AddVertex(value, VertexCopyProperties(props))
 		if err != nil {
 			return fmt.Errorf("failed to add vertex %v: %w", v, err)
 		}

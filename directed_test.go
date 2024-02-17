@@ -62,7 +62,7 @@ func TestDirected_AddVertex(t *testing.T) {
 			}
 
 			hash := graph.hash(vertex)
-			vertex, err := graph.Vertex(hash)
+			vertex, props, err := graph.Vertex(hash)
 			if err != nil {
 				vertices := graph.vertices
 				t.Errorf("%s: vertex %v not found in graph: %v", name, vertex, vertices)
@@ -72,16 +72,16 @@ func TestDirected_AddVertex(t *testing.T) {
 				continue
 			}
 
-			if vertex.Properties.Weight != test.expectedProperties.Weight {
-				t.Errorf("%s: edge weights don't match: expected weight %v, got %v", name, test.expectedProperties.Weight, vertex.Properties.Weight)
+			if props.Weight != test.expectedProperties.Weight {
+				t.Errorf("%s: edge weights don't match: expected weight %v, got %v", name, test.expectedProperties.Weight, props.Weight)
 			}
 
-			if len(vertex.Properties.Attributes) != len(test.expectedProperties.Attributes) {
-				t.Fatalf("%s: attributes lengths don't match: expcted %v, got %v", name, len(test.expectedProperties.Attributes), len(vertex.Properties.Attributes))
+			if len(props.Attributes) != len(test.expectedProperties.Attributes) {
+				t.Fatalf("%s: attributes lengths don't match: expcted %v, got %v", name, len(test.expectedProperties.Attributes), len(props.Attributes))
 			}
 
 			for expectedKey, expectedValue := range test.expectedProperties.Attributes {
-				value, ok := vertex.Properties.Attributes[expectedKey]
+				value, ok := props.Attributes[expectedKey]
 				if !ok {
 					t.Errorf("%s: attribute keys don't match: expected key %v not found", name, expectedKey)
 				}
@@ -113,7 +113,7 @@ func TestDirected_Vertex(t *testing.T) {
 	for name, test := range tests {
 		graph := newTestGraph(test.vertices, nil)
 
-		vertex, err := graph.Vertex(test.vertex)
+		vertex, _, err := graph.Vertex(test.vertex)
 
 		if !errors.Is(err, test.expectedError) {
 			t.Errorf("%s: error expectancy doesn't match: expected %v, got %v", name, test.expectedError, err)
@@ -123,7 +123,7 @@ func TestDirected_Vertex(t *testing.T) {
 			continue
 		}
 
-		if vertex.Value != test.vertex {
+		if vertex != test.vertex {
 			t.Errorf("%s: vertex expectancy doesn't match: expected %v, got %v", name, test.vertex, vertex)
 		}
 	}

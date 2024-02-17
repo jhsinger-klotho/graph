@@ -16,7 +16,7 @@ import (
 //
 // TopologicalSort only works for directed acyclic graphs. This implementation
 // works non-recursively and utilizes Kahn's algorithm.
-func TopologicalSort[K comparable, E any](predecessorMap map[K]map[K]Edge[K, E]) func(yield func(K, error) bool) {
+func TopologicalSort[K comparable, E any](predecessorMap map[K]map[K]Edge[K, E]) func(yield func(K) bool) {
 	return StableTopologicalSort(predecessorMap, nil)
 }
 
@@ -25,36 +25,83 @@ func TopologicalSort[K comparable, E any](predecessorMap map[K]map[K]Edge[K, E])
 // and deterministic output even for graphs with multiple topological orderings.
 // If the less function is nil, the order will be non-deterministic as in [TopologicalSort].
 // Use [PredecessorMap] to get normal topological order; use [AdjacencyMap] to get
-// reverse topological order.
+// reverse topological order, but keep 'less' as normal.
+// This will pick an arbitrary vertex when a cycle is encountered.
 // Note, this function is destructive to the map.
-func StableTopologicalSort[K comparable, E any](predecessorMap map[K]map[K]Edge[K, E], less func(K, K) bool) func(yield func(K, error) bool) {
+func StableTopologicalSort[K comparable, E any](predecessorMap map[K]map[K]Edge[K, E], less func(K, K) bool) func(yield func(K) bool) {
 	queue := make([]K, 0, len(predecessorMap))
-	queued := make(map[K]struct{}, len(predecessorMap))
+	seen := make(map[K]struct{}, len(predecessorMap))
+	frontier := make([]K, 0, len(predecessorMap))
 
 	for vertex, predecessors := range predecessorMap {
 		if len(predecessors) == 0 {
 			queue = append(queue, vertex)
-			queued[vertex] = struct{}{}
+			seen[vertex] = struct{}{}
 			delete(predecessorMap, vertex)
 		}
 	}
 
+	isInverted := false
+invertedCheck:
+	for _, ps := range predecessorMap {
+		for t, e := range ps {
+			isInverted = e.Target == t
+			break invertedCheck
+		}
+	}
+
 	if less != nil {
+		if isInverted {
+			oldLess := less
+			less = func(a, b K) bool {
+				return oldLess(b, a)
+			}
+		}
 		sort.Slice(queue, func(i, j int) bool {
 			return less(queue[i], queue[j])
 		})
 	}
 
-	return func(yield func(K, error) bool) {
-		for len(queue) > 0 {
-			currentVertex := queue[0]
-			queue = queue[1:]
+	return func(yield func(K) bool) {
+		var currentVertex K
+		for {
+			if len(queue) == 0 {
+				if len(predecessorMap) == 0 {
+					return
+				}
+				remaining := make([]K, 0, len(predecessorMap))
+				for vertex := range predecessorMap {
+					remaining = append(remaining, vertex)
+				}
+				sort.Slice(remaining, func(i, j int) bool {
+					// Pick an arbitrary vertex to start the queue based first on the number of remaining predecessors
+					iPcount := len(predecessorMap[remaining[i]])
+					jPcount := len(predecessorMap[remaining[j]])
+					if iPcount != jPcount {
+						if isInverted {
+							return iPcount > jPcount
+						} else {
+							return iPcount < jPcount
+						}
+					}
 
-			if !yield(currentVertex, nil) {
+					if less != nil {
+						return less(remaining[i], remaining[j])
+					}
+					return i < j
+				})
+				currentVertex = remaining[0]
+				seen[currentVertex] = struct{}{}
+				delete(predecessorMap, currentVertex)
+			} else {
+				currentVertex, queue = queue[0], queue[1:]
+			}
+
+			if !yield(currentVertex) {
 				return
 			}
 
-			frontier := make([]K, 0)
+			frontier = frontier[:0]
 
 			for vertex, predecessors := range predecessorMap {
 				delete(predecessors, currentVertex)
@@ -63,12 +110,12 @@ func StableTopologicalSort[K comparable, E any](predecessorMap map[K]map[K]Edge[
 					continue
 				}
 
-				if _, ok := queued[vertex]; ok {
+				if _, ok := seen[vertex]; ok {
 					continue
 				}
 
 				frontier = append(frontier, vertex)
-				queued[vertex] = struct{}{}
+				seen[vertex] = struct{}{}
 				// No more predecessors, so we can remove the vertex from the map.
 				// Used for bookkeeping to check for leftover predecessors, indicating
 				// a cycle in the graph.
@@ -82,10 +129,6 @@ func StableTopologicalSort[K comparable, E any](predecessorMap map[K]map[K]Edge[
 			}
 
 			queue = append(queue, frontier...)
-		}
-		if len(predecessorMap) > 0 {
-			var zero K
-			yield(zero, fmt.Errorf("graph contains a cycle"))
 		}
 	}
 }
