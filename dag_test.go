@@ -8,13 +8,13 @@ import (
 func TestDirectedTopologicalSort(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []int
-		edges         []Edge[int]
+		edges         []Edge[int, any]
 		expectedOrder []int
 		shouldFail    bool
 	}{
 		"graph with 5 vertices": {
 			vertices: []int{1, 2, 3, 4, 5},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 3},
@@ -27,7 +27,7 @@ func TestDirectedTopologicalSort(t *testing.T) {
 		},
 		"graph with cycle": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 2, Target: 3},
 				{Source: 3, Target: 1},
@@ -37,14 +37,14 @@ func TestDirectedTopologicalSort(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(IntHash, Directed())
+		graph := NewMemoryGraph[int, int, any](IntHash, Directed())
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)
 		}
 
 		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
+			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight[any](edge.Properties.Weight)); err != nil {
 				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
 			}
 		}
@@ -85,13 +85,13 @@ func TestDirectedTopologicalSort(t *testing.T) {
 func TestDirectedStableTopologicalSort(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []int
-		edges         []Edge[int]
+		edges         []Edge[int, any]
 		expectedOrder []int
 		shouldFail    bool
 	}{
 		"graph with 5 vertices": {
 			vertices: []int{1, 2, 3, 4, 5},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 3},
@@ -104,7 +104,7 @@ func TestDirectedStableTopologicalSort(t *testing.T) {
 		},
 		"graph with many possible topological orders": {
 			vertices: []int{1, 2, 3, 4, 5, 6, 10, 20, 30, 40, 50, 60},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 10},
 				{Source: 2, Target: 20},
 				{Source: 3, Target: 30},
@@ -116,7 +116,7 @@ func TestDirectedStableTopologicalSort(t *testing.T) {
 		},
 		"graph with cycle": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 2, Target: 3},
 				{Source: 3, Target: 1},
@@ -126,14 +126,14 @@ func TestDirectedStableTopologicalSort(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(IntHash, Directed())
+		graph := NewMemoryGraph[int, int, any](IntHash, Directed())
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)
 		}
 
 		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
+			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight[any](edge.Properties.Weight)); err != nil {
 				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
 			}
 		}
@@ -177,8 +177,8 @@ func TestDirectedStableTopologicalSort(t *testing.T) {
 	}
 }
 
-func edgesEqualFunc[K comparable, T any](hash Hash[K, T]) func(a, b Edge[T]) bool {
-	return func(a, b Edge[T]) bool {
+func edgesEqualFunc[K comparable, V any, E any](hash Hash[K, V]) func(a, b Edge[V, E]) bool {
+	return func(a, b Edge[V, E]) bool {
 		return EdgesEqual(hash, a, b)
 	}
 }
@@ -186,13 +186,13 @@ func edgesEqualFunc[K comparable, T any](hash Hash[K, T]) func(a, b Edge[T]) boo
 func TestDirectedTransitiveReduction(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []string
-		edges         []Edge[string]
-		expectedEdges []Edge[string]
+		edges         []Edge[string, any]
+		expectedEdges []Edge[string, any]
 		shouldFail    bool
 	}{
 		"graph as on img/transitive-reduction-before.svg": {
 			vertices: []string{"A", "B", "C", "D", "E"},
-			edges: []Edge[string]{
+			edges: []Edge[string, any]{
 				{Source: "A", Target: "B"},
 				{Source: "A", Target: "C"},
 				{Source: "A", Target: "D"},
@@ -202,7 +202,7 @@ func TestDirectedTransitiveReduction(t *testing.T) {
 				{Source: "C", Target: "E"},
 				{Source: "D", Target: "E"},
 			},
-			expectedEdges: []Edge[string]{
+			expectedEdges: []Edge[string, any]{
 				{Source: "A", Target: "B"},
 				{Source: "A", Target: "C"},
 				{Source: "B", Target: "D"},
@@ -212,7 +212,7 @@ func TestDirectedTransitiveReduction(t *testing.T) {
 		},
 		"graph with cycle": {
 			vertices: []string{"A", "B", "C"},
-			edges: []Edge[string]{
+			edges: []Edge[string, any]{
 				{Source: "A", Target: "B"},
 				{Source: "B", Target: "C"},
 				{Source: "C", Target: "A"},
@@ -221,7 +221,7 @@ func TestDirectedTransitiveReduction(t *testing.T) {
 		},
 		"graph from issue 83": {
 			vertices: []string{"_root", "A", "B", "C", "D", "E", "F"},
-			edges: []Edge[string]{
+			edges: []Edge[string, any]{
 				{Source: "_root", Target: "A"},
 				{Source: "_root", Target: "B"},
 				{Source: "_root", Target: "C"},
@@ -235,7 +235,7 @@ func TestDirectedTransitiveReduction(t *testing.T) {
 				{Source: "C", Target: "A"},
 				{Source: "C", Target: "B"},
 			},
-			expectedEdges: []Edge[string]{
+			expectedEdges: []Edge[string, any]{
 				{Source: "_root", Target: "F"},
 				{Source: "F", Target: "D"},
 				{Source: "F", Target: "E"},
@@ -247,14 +247,14 @@ func TestDirectedTransitiveReduction(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := NewMemoryGraph(StringHash, Directed())
+		graph := NewMemoryGraph[string, string, any](StringHash, Directed())
 
 		for _, vertex := range test.vertices {
 			_ = graph.AddVertex(vertex)
 		}
 
 		for _, edge := range test.edges {
-			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
+			if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight[any](edge.Properties.Weight)); err != nil {
 				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
 			}
 		}
@@ -269,7 +269,7 @@ func TestDirectedTransitiveReduction(t *testing.T) {
 			continue
 		}
 
-		actualEdges := make([]Edge[string], 0)
+		actualEdges := make([]Edge[string, any], 0)
 		adjacencyMap, _ := graph.AdjacencyMap()
 
 		for _, adjacencies := range adjacencyMap {
@@ -278,7 +278,7 @@ func TestDirectedTransitiveReduction(t *testing.T) {
 			}
 		}
 
-		equalsFunc := edgesEqualFunc(StringHash)
+		equalsFunc := edgesEqualFunc[string, string, any](StringHash)
 
 		if !slicesAreEqualWithFunc(actualEdges, test.expectedEdges, equalsFunc) {
 			t.Errorf("%s: edge expectancy doesn't match: expected %v, got %v", name, test.expectedEdges, actualEdges)

@@ -10,7 +10,7 @@ import (
 //
 // The MST contains all vertices from the given graph as well as the required
 // edges for building the MST. The original graph remains unchanged.
-func MinimumSpanningTree[K comparable, T any](g Graph[K, T], mst Graph[K, T]) error {
+func MinimumSpanningTree[K comparable, V any, E any](g Graph[K, V, E], mst Graph[K, V, E]) error {
 	return spanningTree(g, false, mst)
 }
 
@@ -19,17 +19,17 @@ func MinimumSpanningTree[K comparable, T any](g Graph[K, T], mst Graph[K, T]) er
 //
 // The MST contains all vertices from the given graph as well as the required
 // edges for building the MST. The original graph remains unchanged.
-func MaximumSpanningTree[K comparable, T any](g Graph[K, T], mst Graph[K, T]) error {
+func MaximumSpanningTree[K comparable, V any, E any](g Graph[K, V, E], mst Graph[K, V, E]) error {
 	return spanningTree(g, true, mst)
 }
 
-func spanningTree[K comparable, T any](g Graph[K, T], maximum bool, mst Graph[K, T]) error {
-	adjacencyMap, err := AdjacencyMap[K, T](g)
+func spanningTree[K comparable, V any, E any](g Graph[K, V, E], maximum bool, mst Graph[K, V, E]) error {
+	adjacencyMap, err := AdjacencyMap[K, V](g)
 	if err != nil {
 		return fmt.Errorf("failed to get adjacency map: %w", err)
 	}
 
-	edges := make([]Edge[K], 0)
+	edges := make([]Edge[K, E], 0)
 	subtrees := newUnionFind[K]()
 
 	for v, adjacencies := range adjacencyMap {

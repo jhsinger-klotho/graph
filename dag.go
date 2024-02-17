@@ -16,7 +16,7 @@ import (
 //
 // TopologicalSort only works for directed acyclic graphs. This implementation
 // works non-recursively and utilizes Kahn's algorithm.
-func TopologicalSort[K comparable](predecessorMap map[K]map[K]Edge[K]) func(yield func(K, error) bool) {
+func TopologicalSort[K comparable, E any](predecessorMap map[K]map[K]Edge[K, E]) func(yield func(K, error) bool) {
 	return StableTopologicalSort(predecessorMap, nil)
 }
 
@@ -27,7 +27,7 @@ func TopologicalSort[K comparable](predecessorMap map[K]map[K]Edge[K]) func(yiel
 // Use [PredecessorMap] to get normal topological order; use [AdjacencyMap] to get
 // reverse topological order.
 // Note, this function is destructive to the map.
-func StableTopologicalSort[K comparable](predecessorMap map[K]map[K]Edge[K], less func(K, K) bool) func(yield func(K, error) bool) {
+func StableTopologicalSort[K comparable, E any](predecessorMap map[K]map[K]Edge[K, E], less func(K, K) bool) func(yield func(K, error) bool) {
 	queue := make([]K, 0, len(predecessorMap))
 	queued := make(map[K]struct{}, len(predecessorMap))
 
@@ -95,7 +95,7 @@ func StableTopologicalSort[K comparable](predecessorMap map[K]map[K]Edge[K], les
 // must be a directed acyclic graph.
 //
 // TransitiveReduction is a very expensive operation scaling with O(V(V+E)).
-func TransitiveReduction[K comparable, T any](g Graph[K, T]) error {
+func TransitiveReduction[K comparable, V any, E any](g Graph[K, V, E]) error {
 	adjacencyMap, err := AdjacencyMap(g)
 	if err != nil {
 		return fmt.Errorf("failed to get adajcency map: %w", err)

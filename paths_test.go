@@ -9,18 +9,18 @@ import (
 func TestDirectedCreatesCycle(t *testing.T) {
 	// A wrapper type to passthrough read operations, but not other methods (to skip the interface check for custom impl)
 	type RO struct {
-		GraphRead[int, int]
+		GraphRead[int, int, any]
 	}
 	tests := map[string]struct {
 		vertices     []int
-		edges        []Edge[int]
+		edges        []Edge[int, any]
 		sourceHash   int
 		targetHash   int
 		createsCycle bool
 	}{
 		"directed 2-4-7-5 cycle": {
 			vertices: []int{1, 2, 3, 4, 5, 6, 7},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -34,7 +34,7 @@ func TestDirectedCreatesCycle(t *testing.T) {
 		},
 		"undirected 2-4-7-5 'cycle'": {
 			vertices: []int{1, 2, 3, 4, 5, 6, 7},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -49,7 +49,7 @@ func TestDirectedCreatesCycle(t *testing.T) {
 		},
 		"no cycle": {
 			vertices: []int{1, 2, 3, 4, 5, 6, 7},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -80,8 +80,8 @@ func TestDirectedCreatesCycle(t *testing.T) {
 }
 func TestUndirectedCreatesCycle(t *testing.T) {
 	type ReadRelation interface {
-		GraphRead[int, int]
-		GraphRelations[int]
+		GraphRead[int, int, any]
+		GraphRelations[int, any]
 	}
 	// A wrapper type to passthrough read operations, but not other methods (to skip the interface check for custom impl)
 	type RO struct {
@@ -89,14 +89,14 @@ func TestUndirectedCreatesCycle(t *testing.T) {
 	}
 	tests := map[string]struct {
 		vertices     []int
-		edges        []Edge[int]
+		edges        []Edge[int, any]
 		sourceHash   int
 		targetHash   int
 		createsCycle bool
 	}{
 		"undirected 2-4-7-5 cycle": {
 			vertices: []int{1, 2, 3, 4, 5, 6, 7},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -110,7 +110,7 @@ func TestUndirectedCreatesCycle(t *testing.T) {
 		},
 		"undirected 5-6-3-1-2-7 cycle": {
 			vertices: []int{1, 2, 3, 4, 5, 6, 7},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -124,7 +124,7 @@ func TestUndirectedCreatesCycle(t *testing.T) {
 		},
 		"no cycle": {
 			vertices: []int{1, 2, 3, 4, 5, 6, 7},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -157,7 +157,7 @@ func TestDirectedShortestPath(t *testing.T) {
 	tests := map[string]struct {
 		vertices             []string
 		vertexWeights        map[string]float64
-		edges                []Edge[string]
+		edges                []Edge[string, any]
 		sourceHash           string
 		targetHash           string
 		expectedShortestPath []string
@@ -165,17 +165,17 @@ func TestDirectedShortestPath(t *testing.T) {
 	}{
 		"graph as on img/dijkstra.svg": {
 			vertices: []string{"A", "B", "C", "D", "E", "F", "G"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 3}},
-				{Source: "A", Target: "F", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 4}},
-				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 1}},
-				{Source: "C", Target: "F", Properties: EdgeProperties{Weight: 2}},
-				{Source: "D", Target: "B", Properties: EdgeProperties{Weight: 1}},
-				{Source: "E", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "E", Target: "F", Properties: EdgeProperties{Weight: 3}},
-				{Source: "F", Target: "G", Properties: EdgeProperties{Weight: 5}},
-				{Source: "G", Target: "B", Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "A", Target: "F", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "C", Target: "E", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "C", Target: "F", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "D", Target: "B", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "E", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "E", Target: "F", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "F", Target: "G", Properties: EdgeProperties[any]{Weight: 5}},
+				{Source: "G", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			sourceHash:           "A",
 			targetHash:           "B",
@@ -183,11 +183,11 @@ func TestDirectedShortestPath(t *testing.T) {
 		},
 		"diamond-shaped graph": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			sourceHash:           "A",
 			targetHash:           "D",
@@ -195,14 +195,14 @@ func TestDirectedShortestPath(t *testing.T) {
 		},
 		"unweighted graph": {
 			vertices: []string{"A", "B", "C", "D", "E", "F", "G"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{}},
-				{Source: "C", Target: "F", Properties: EdgeProperties{}},
-				{Source: "D", Target: "G", Properties: EdgeProperties{}},
-				{Source: "E", Target: "G", Properties: EdgeProperties{}},
-				{Source: "F", Target: "E", Properties: EdgeProperties{}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{}},
+				{Source: "C", Target: "F", Properties: EdgeProperties[any]{}},
+				{Source: "D", Target: "G", Properties: EdgeProperties[any]{}},
+				{Source: "E", Target: "G", Properties: EdgeProperties[any]{}},
+				{Source: "F", Target: "E", Properties: EdgeProperties[any]{}},
 			},
 			sourceHash:           "A",
 			targetHash:           "G",
@@ -210,11 +210,11 @@ func TestDirectedShortestPath(t *testing.T) {
 		},
 		"source equal to target": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			sourceHash:           "B",
 			targetHash:           "B",
@@ -222,9 +222,9 @@ func TestDirectedShortestPath(t *testing.T) {
 		},
 		"target not reachable in a disconnected graph": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
 			},
 			sourceHash:           "A",
 			targetHash:           "D",
@@ -233,9 +233,9 @@ func TestDirectedShortestPath(t *testing.T) {
 		},
 		"target not reachable in a connected graph": {
 			vertices: []string{"A", "B", "C"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 0}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 0}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 0}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 0}},
 			},
 			sourceHash:           "B",
 			targetHash:           "C",
@@ -244,12 +244,12 @@ func TestDirectedShortestPath(t *testing.T) {
 		},
 		"graph from issue 88": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 6}},
-				{Source: "B", Target: "C", Properties: EdgeProperties{Weight: 3}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 5}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 1}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 6}},
+				{Source: "B", Target: "C", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 5}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 1}},
 			},
 			sourceHash:           "A",
 			targetHash:           "D",
@@ -257,13 +257,13 @@ func TestDirectedShortestPath(t *testing.T) {
 		},
 		"can process negative weights": {
 			vertices: []string{"A", "B", "C", "D", "E"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 1}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 2}},
-				{Source: "B", Target: "C", Properties: EdgeProperties{Weight: 2}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 2}},
-				{Source: "D", Target: "E", Properties: EdgeProperties{Weight: -1}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "B", Target: "C", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "E", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "D", Target: "E", Properties: EdgeProperties[any]{Weight: -1}},
 			},
 			sourceHash:           "A",
 			targetHash:           "E",
@@ -277,7 +277,7 @@ func TestDirectedShortestPath(t *testing.T) {
 				"C": 2,
 				"D": 0,
 			},
-			edges: []Edge[string]{
+			edges: []Edge[string, any]{
 				{Source: "A", Target: "B"},
 				{Source: "A", Target: "C"},
 				{Source: "B", Target: "D"},
@@ -290,17 +290,17 @@ func TestDirectedShortestPath(t *testing.T) {
 		"vertex and edge weights": {
 			// like the img/dijkstra.svg graph, but with vertex weights to make the shortest path different
 			vertices: []string{"A", "B", "C", "D", "E", "F", "G"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 3}},
-				{Source: "A", Target: "F", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 4}},
-				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 1}},
-				{Source: "C", Target: "F", Properties: EdgeProperties{Weight: 2}},
-				{Source: "D", Target: "B", Properties: EdgeProperties{Weight: 1}},
-				{Source: "E", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "E", Target: "F", Properties: EdgeProperties{Weight: 3}},
-				{Source: "F", Target: "G", Properties: EdgeProperties{Weight: 5}},
-				{Source: "G", Target: "B", Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "A", Target: "F", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "C", Target: "E", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "C", Target: "F", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "D", Target: "B", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "E", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "E", Target: "F", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "F", Target: "G", Properties: EdgeProperties[any]{Weight: 5}},
+				{Source: "G", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			vertexWeights: map[string]float64{
 				"A": 1,
@@ -319,7 +319,7 @@ func TestDirectedShortestPath(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			graph := NewMemoryGraph(StringHash, Directed())
+			graph := NewMemoryGraph[string, string, any](StringHash, Directed())
 
 			for _, vertex := range test.vertices {
 				if w, ok := test.vertexWeights[vertex]; ok {
@@ -357,7 +357,7 @@ func TestDirectedShortestPath(t *testing.T) {
 func TestUndirectedShortestPath(t *testing.T) {
 	tests := map[string]struct {
 		vertices             []string
-		edges                []Edge[string]
+		edges                []Edge[string, any]
 		sourceHash           string
 		targetHash           string
 		isWeighted           bool
@@ -366,17 +366,17 @@ func TestUndirectedShortestPath(t *testing.T) {
 	}{
 		"graph as on img/dijkstra.svg": {
 			vertices: []string{"A", "B", "C", "D", "E", "F", "G"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 3}},
-				{Source: "A", Target: "F", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 4}},
-				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 1}},
-				{Source: "C", Target: "F", Properties: EdgeProperties{Weight: 2}},
-				{Source: "D", Target: "B", Properties: EdgeProperties{Weight: 1}},
-				{Source: "E", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "E", Target: "F", Properties: EdgeProperties{Weight: 3}},
-				{Source: "F", Target: "G", Properties: EdgeProperties{Weight: 5}},
-				{Source: "G", Target: "B", Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "A", Target: "F", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "C", Target: "E", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "C", Target: "F", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "D", Target: "B", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "E", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "E", Target: "F", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "F", Target: "G", Properties: EdgeProperties[any]{Weight: 5}},
+				{Source: "G", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			isWeighted:           true,
 			sourceHash:           "A",
@@ -385,11 +385,11 @@ func TestUndirectedShortestPath(t *testing.T) {
 		},
 		"diamond-shaped graph": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			isWeighted:           true,
 			sourceHash:           "A",
@@ -398,14 +398,14 @@ func TestUndirectedShortestPath(t *testing.T) {
 		},
 		"unweighted graph": {
 			vertices: []string{"A", "B", "C", "D", "E", "F", "G"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{}},
-				{Source: "C", Target: "F", Properties: EdgeProperties{}},
-				{Source: "D", Target: "G", Properties: EdgeProperties{}},
-				{Source: "E", Target: "G", Properties: EdgeProperties{}},
-				{Source: "F", Target: "E", Properties: EdgeProperties{}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{}},
+				{Source: "C", Target: "F", Properties: EdgeProperties[any]{}},
+				{Source: "D", Target: "G", Properties: EdgeProperties[any]{}},
+				{Source: "E", Target: "G", Properties: EdgeProperties[any]{}},
+				{Source: "F", Target: "E", Properties: EdgeProperties[any]{}},
 			},
 			sourceHash:           "A",
 			targetHash:           "G",
@@ -413,11 +413,11 @@ func TestUndirectedShortestPath(t *testing.T) {
 		},
 		"source equal to target": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			isWeighted:           true,
 			sourceHash:           "B",
@@ -426,9 +426,9 @@ func TestUndirectedShortestPath(t *testing.T) {
 		},
 		"target not reachable in a disconnected graph": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
 			},
 			isWeighted:           true,
 			sourceHash:           "A",
@@ -440,14 +440,14 @@ func TestUndirectedShortestPath(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			graph := NewMemoryGraph(StringHash)
+			graph := NewMemoryGraph[string, string, any](StringHash)
 
 			for _, vertex := range test.vertices {
 				_ = graph.AddVertex(vertex)
 			}
 
 			for _, edge := range test.edges {
-				if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
+				if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight[any](edge.Properties.Weight)); err != nil {
 					t.Fatalf("%s: failed to add edge: %s", name, err.Error())
 				}
 			}
@@ -474,7 +474,7 @@ func TestUndirectedShortestPath(t *testing.T) {
 func Test_BellmanFord(t *testing.T) {
 	tests := map[string]struct {
 		vertices             []string
-		edges                []Edge[string]
+		edges                []Edge[string, any]
 		sourceHash           string
 		targetHash           string
 		isWeighted           bool
@@ -484,18 +484,18 @@ func Test_BellmanFord(t *testing.T) {
 	}{
 		"graph as on img/dijkstra.svg": {
 			vertices: []string{"A", "B", "C", "D", "E", "F", "G"},
-			edges: []Edge[string]{
+			edges: []Edge[string, any]{
 
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 3}},
-				{Source: "A", Target: "F", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 4}},
-				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 1}},
-				{Source: "C", Target: "F", Properties: EdgeProperties{Weight: 2}},
-				{Source: "D", Target: "B", Properties: EdgeProperties{Weight: 1}},
-				{Source: "E", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "E", Target: "F", Properties: EdgeProperties{Weight: 3}},
-				{Source: "F", Target: "G", Properties: EdgeProperties{Weight: 5}},
-				{Source: "G", Target: "B", Properties: EdgeProperties{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "A", Target: "F", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "C", Target: "E", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "C", Target: "F", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "D", Target: "B", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "E", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "E", Target: "F", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "F", Target: "G", Properties: EdgeProperties[any]{Weight: 5}},
+				{Source: "G", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			isWeighted:           true,
 			IsDirected:           true,
@@ -505,11 +505,11 @@ func Test_BellmanFord(t *testing.T) {
 		},
 		"diamond-shaped graph": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			isWeighted:           true,
 			IsDirected:           true,
@@ -519,14 +519,14 @@ func Test_BellmanFord(t *testing.T) {
 		},
 		"unweighted graph": {
 			vertices: []string{"A", "B", "C", "D", "E", "F", "G"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{}},
-				{Source: "C", Target: "F", Properties: EdgeProperties{}},
-				{Source: "D", Target: "G", Properties: EdgeProperties{}},
-				{Source: "E", Target: "G", Properties: EdgeProperties{}},
-				{Source: "F", Target: "E", Properties: EdgeProperties{}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{}},
+				{Source: "C", Target: "F", Properties: EdgeProperties[any]{}},
+				{Source: "D", Target: "G", Properties: EdgeProperties[any]{}},
+				{Source: "E", Target: "G", Properties: EdgeProperties[any]{}},
+				{Source: "F", Target: "E", Properties: EdgeProperties[any]{}},
 			},
 			IsDirected:           true,
 			sourceHash:           "A",
@@ -535,11 +535,11 @@ func Test_BellmanFord(t *testing.T) {
 		},
 		"source equal to target": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			isWeighted:           true,
 			IsDirected:           true,
@@ -549,9 +549,9 @@ func Test_BellmanFord(t *testing.T) {
 		},
 		"target not reachable in a disconnected graph": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
 			},
 			isWeighted:           true,
 			IsDirected:           true,
@@ -562,13 +562,13 @@ func Test_BellmanFord(t *testing.T) {
 		},
 		"negative weights graph": {
 			vertices: []string{"A", "B", "C", "D", "E"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 1}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 2}},
-				{Source: "B", Target: "C", Properties: EdgeProperties{Weight: 2}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 2}},
-				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 2}},
-				{Source: "D", Target: "E", Properties: EdgeProperties{Weight: -1}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "B", Target: "C", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "C", Target: "E", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "D", Target: "E", Properties: EdgeProperties[any]{Weight: -1}},
 			},
 			isWeighted:           true,
 			IsDirected:           true,
@@ -578,15 +578,15 @@ func Test_BellmanFord(t *testing.T) {
 		},
 		"fails on negative cycles": {
 			vertices: []string{"A", "B", "C", "D", "E"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 1}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
-				{Source: "B", Target: "C", Properties: EdgeProperties{Weight: 2}},
-				{Source: "B", Target: "D", Properties: EdgeProperties{Weight: 6}},
-				{Source: "C", Target: "D", Properties: EdgeProperties{Weight: 3}},
-				{Source: "C", Target: "E", Properties: EdgeProperties{Weight: 2}},
-				{Source: "D", Target: "E", Properties: EdgeProperties{Weight: -3}},
-				{Source: "E", Target: "C", Properties: EdgeProperties{Weight: -3}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
+				{Source: "B", Target: "C", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "B", Target: "D", Properties: EdgeProperties[any]{Weight: 6}},
+				{Source: "C", Target: "D", Properties: EdgeProperties[any]{Weight: 3}},
+				{Source: "C", Target: "E", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "D", Target: "E", Properties: EdgeProperties[any]{Weight: -3}},
+				{Source: "E", Target: "C", Properties: EdgeProperties[any]{Weight: -3}},
 			},
 			isWeighted:           true,
 			IsDirected:           true,
@@ -597,9 +597,9 @@ func Test_BellmanFord(t *testing.T) {
 		},
 		"fails if not directed": {
 			vertices: []string{"A", "B", "C", "D"},
-			edges: []Edge[string]{
-				{Source: "A", Target: "B", Properties: EdgeProperties{Weight: 2}},
-				{Source: "A", Target: "C", Properties: EdgeProperties{Weight: 4}},
+			edges: []Edge[string, any]{
+				{Source: "A", Target: "B", Properties: EdgeProperties[any]{Weight: 2}},
+				{Source: "A", Target: "C", Properties: EdgeProperties[any]{Weight: 4}},
 			},
 			isWeighted:           true,
 			sourceHash:           "A",
@@ -610,14 +610,14 @@ func Test_BellmanFord(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			graph := NewMemoryGraph(StringHash, Directed())
+			graph := NewMemoryGraph[string, string, any](StringHash, Directed())
 
 			for _, vertex := range test.vertices {
 				_ = graph.AddVertex(vertex)
 			}
 
 			for _, edge := range test.edges {
-				if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight(edge.Properties.Weight)); err != nil {
+				if err := graph.AddEdge(edge.Source, edge.Target, EdgeWeight[any](edge.Properties.Weight)); err != nil {
 					t.Fatalf("%s: failed to add edge: %s", name, err.Error())
 				}
 			}
@@ -644,12 +644,12 @@ func Test_BellmanFord(t *testing.T) {
 func TestDirectedStronglyConnectedComponents(t *testing.T) {
 	tests := map[string]struct {
 		vertices     []int
-		edges        []Edge[int]
+		edges        []Edge[int, any]
 		expectedSCCs [][]int
 	}{
 		"graph with SCCs as on img/scc.svg": {
 			vertices: []int{1, 2, 3, 4, 5, 6, 7, 8},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 2, Target: 3},
 				{Source: 2, Target: 5},
@@ -692,23 +692,23 @@ func TestDirectedStronglyConnectedComponents(t *testing.T) {
 }
 
 func TestAllPathsBetween(t *testing.T) {
-	type args[K comparable, T any] struct {
-		g     Graph[K, T]
-		start K
-		end   K
+	type args struct {
+		g     Graph[int, int, any]
+		start int
+		end   int
 	}
 	type testCase[K comparable, T any] struct {
 		name    string
-		args    args[K, T]
+		args    args
 		want    [][]K
 		wantErr bool
 	}
 	tests := []testCase[int, int]{
 		{
 			name: "directed",
-			args: args[int, int]{
-				g: func() Graph[int, int] {
-					g := NewMemoryGraph(IntHash, Directed())
+			args: args{
+				g: func() Graph[int, int, any] {
+					g := NewMemoryGraph[int, int, any](IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
 					}
@@ -739,9 +739,9 @@ func TestAllPathsBetween(t *testing.T) {
 		},
 		{
 			name: "undirected",
-			args: args[int, int]{
-				g: func() Graph[int, int] {
-					g := NewMemoryGraph(IntHash)
+			args: args{
+				g: func() Graph[int, int, any] {
+					g := NewMemoryGraph[int, int, any](IntHash)
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
 					}
@@ -775,9 +775,9 @@ func TestAllPathsBetween(t *testing.T) {
 		},
 		{
 			name: "directed with cycle",
-			args: args[int, int]{
-				g: func() Graph[int, int] {
-					g := NewMemoryGraph(IntHash, Directed())
+			args: args{
+				g: func() Graph[int, int, any] {
+					g := NewMemoryGraph[int, int, any](IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
 					}
@@ -799,9 +799,9 @@ func TestAllPathsBetween(t *testing.T) {
 		},
 		{
 			name: "directed with self cycle",
-			args: args[int, int]{
-				g: func() Graph[int, int] {
-					g := NewMemoryGraph(IntHash, Directed())
+			args: args{
+				g: func() Graph[int, int, any] {
+					g := NewMemoryGraph[int, int, any](IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
 					}
@@ -825,9 +825,9 @@ func TestAllPathsBetween(t *testing.T) {
 		},
 		{
 			name: "directed with unuseable cycle",
-			args: args[int, int]{
-				g: func() Graph[int, int] {
-					g := NewMemoryGraph(IntHash, Directed())
+			args: args{
+				g: func() Graph[int, int, any] {
+					g := NewMemoryGraph[int, int, any](IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
 					}

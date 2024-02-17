@@ -46,21 +46,21 @@ func TestIntHash(t *testing.T) {
 
 func TestEdgeWeight(t *testing.T) {
 	tests := map[string]struct {
-		expected EdgeProperties
+		expected EdgeProperties[any]
 		weight   float64
 	}{
 		"weight 4": {
 			weight: 4,
-			expected: EdgeProperties{
+			expected: EdgeProperties[any]{
 				Weight: 4,
 			},
 		},
 	}
 
 	for name, test := range tests {
-		properties := EdgeProperties{}
+		properties := EdgeProperties[any]{}
 
-		EdgeWeight(test.weight)(&properties)
+		EdgeWeight[any](test.weight)(&properties)
 
 		if properties.Weight != test.expected.Weight {
 			t.Errorf("%s: weight expectation doesn't match: expected %v, got %v", name, test.expected.Weight, properties.Weight)
@@ -72,12 +72,12 @@ func TestEdgeAttribute(t *testing.T) {
 	tests := map[string]struct {
 		key      string
 		value    string
-		expected EdgeProperties
+		expected EdgeProperties[any]
 	}{
 		"attribute label=my-label": {
 			key:   "label",
 			value: "my-label",
-			expected: EdgeProperties{
+			expected: EdgeProperties[any]{
 				Attributes: map[string]string{
 					"label": "my-label",
 				},
@@ -87,11 +87,11 @@ func TestEdgeAttribute(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			properties := EdgeProperties{
+			properties := EdgeProperties[any]{
 				Attributes: make(map[string]string),
 			}
 
-			EdgeAttribute(test.key, test.value)(&properties)
+			EdgeAttribute[any](test.key, test.value)(&properties)
 
 			value, ok := properties.Attributes[test.key]
 			if !ok {
@@ -125,11 +125,11 @@ func TestEdgeAttributes(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			properties := EdgeProperties{
+			properties := EdgeProperties[any]{
 				Attributes: make(map[string]string),
 			}
 
-			EdgeAttributes(test.attributes)(&properties)
+			EdgeAttributes[any](test.attributes)(&properties)
 
 			if !mapsAreEqual(test.expected, properties.Attributes) {
 				t.Errorf("expected %v, got %v", test.expected, properties.Attributes)
@@ -210,18 +210,18 @@ func TestVertexAttributes(t *testing.T) {
 
 func TestEdgesEqual(t *testing.T) {
 	tests := map[string]struct {
-		a             Edge[int]
-		b             Edge[int]
+		a             Edge[int, any]
+		b             Edge[int, any]
 		edgesAreEqual bool
 	}{
 		"equal edges in directed graph": {
-			a:             Edge[int]{Source: 1, Target: 2},
-			b:             Edge[int]{Source: 1, Target: 2},
+			a:             Edge[int, any]{Source: 1, Target: 2},
+			b:             Edge[int, any]{Source: 1, Target: 2},
 			edgesAreEqual: true,
 		},
 		"swapped equal edges in directed graph": {
-			a: Edge[int]{Source: 1, Target: 2},
-			b: Edge[int]{Source: 2, Target: 1},
+			a: Edge[int, any]{Source: 1, Target: 2},
+			b: Edge[int, any]{Source: 2, Target: 1},
 		},
 	}
 

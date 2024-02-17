@@ -38,12 +38,12 @@ type DFSer[K comparable] interface {
 //	}
 //
 // DFS is non-recursive and maintains a stack instead.
-func DFS[K comparable, T any](g Graph[K, T], start K) func(yield func(K, error) bool) {
+func DFS[K comparable, V any, E any](g Graph[K, V, E], start K) func(yield func(K, error) bool) {
 	if dfser, ok := g.(DFSer[K]); ok {
 		return dfser.DFS(start)
 	}
 
-	adjacencyMap, err := AdjacencyMap[K, T](g)
+	adjacencyMap, err := AdjacencyMap[K, V](g)
 	if err != nil {
 		return func(yield func(K, error) bool) {
 			var zeroKey K
@@ -77,48 +77,6 @@ func DFS[K comparable, T any](g Graph[K, T], start K) func(yield func(K, error) 
 				for adjacency := range adjacencyMap[currentHash] {
 					stack.push(adjacency)
 				}
-			}
-		}
-	}
-}
-
-func PathsFrom[K comparable](adjacencyMap map[K]map[K]Edge[K], start K) func(yield func(Path[K]) bool) {
-	var queue []Path[K]
-	enqueue := func(current Path[K], next K) {
-		if current.Contains(next) {
-			// Prevent loops
-			return
-		}
-		// make a new slice because `append` won't copy if there's capacity
-		// which causes the latest `append` to overwrite the last element of any previous appends
-		// (as happens when appending in a loop as we do below).
-		//   x := make([]int, 2, 3); x[0] = 1; x[1] = 2
-		//   y := append(x, 3)
-		//   z := append(x, 4)
-		//   fmt.Println(y) // [1 2 4] !!
-		nextPath := make(Path[K], len(current)+1)
-		copy(nextPath, current)
-		nextPath[len(nextPath)-1] = next
-		queue = append(queue, nextPath)
-	}
-
-	startPath := Path[K]{start}
-	for d := range adjacencyMap[start] {
-		enqueue(startPath, d)
-	}
-
-	return func(yield func(Path[K]) bool) {
-		var current Path[K]
-		for len(queue) > 0 {
-			current, queue = queue[0], queue[1:]
-
-			if !yield(current) {
-				break
-			}
-
-			last := current[len(current)-1]
-			for d := range adjacencyMap[last] {
-				enqueue(current, d)
 			}
 		}
 	}
@@ -158,12 +116,12 @@ type BFSer[K comparable] interface {
 //	}
 //
 // BFS is non-recursive and maintains a stack instead.
-func BFS[K comparable, T any](g Graph[K, T], start K) func(yield func(K, error) bool) {
+func BFS[K comparable, V any, E any](g Graph[K, V, E], start K) func(yield func(K, error) bool) {
 	if bfser, ok := g.(BFSer[K]); ok {
 		return bfser.BFS(start)
 	}
 
-	adjacencyMap, err := AdjacencyMap[K, T](g)
+	adjacencyMap, err := AdjacencyMap[K, V](g)
 	if err != nil {
 		return func(yield func(K, error) bool) {
 			var zeroKey K

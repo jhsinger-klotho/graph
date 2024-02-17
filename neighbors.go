@@ -6,24 +6,24 @@ import (
 	"sort"
 )
 
-type GraphNeighbors[K comparable] interface {
-	DownstreamNeighbors(K) func(yield func(Edge[K], error) bool)
-	UpstreamNeighbors(K) func(yield func(Edge[K], error) bool)
+type GraphNeighbors[K comparable, E any] interface {
+	DownstreamNeighbors(K) func(yield func(Edge[K, E], error) bool)
+	UpstreamNeighbors(K) func(yield func(Edge[K, E], error) bool)
 }
 
 // DownstreamNeighbors returns an iterator over the downstream neighbors of the given vertex.
 // Thus, all edges have `.Source == source`.
-func DownstreamNeighbors[K comparable, T any](g GraphRead[K, T], source K) func(yield func(Edge[K], error) bool) {
+func DownstreamNeighbors[K comparable, V any, E any](g GraphRead[K, V, E], source K) func(yield func(Edge[K, E], error) bool) {
 	if rel, ok := g.(interface {
-		DownstreamNeighbors(K) func(yield func(Edge[K], error) bool)
+		DownstreamNeighbors(K) func(yield func(Edge[K, E], error) bool)
 	}); ok {
 		return rel.DownstreamNeighbors(source)
 	}
 
-	return func(yield func(Edge[K], error) bool) {
+	return func(yield func(Edge[K, E], error) bool) {
 		adj, err := AdjacencyMap(g)
 		if err != nil {
-			yield(Edge[K]{}, err)
+			yield(Edge[K, E]{}, err)
 			return
 		}
 		for _, adjacencies := range adj {
@@ -38,17 +38,17 @@ func DownstreamNeighbors[K comparable, T any](g GraphRead[K, T], source K) func(
 
 // UpstreamNeighbors returns an iterator over the upstream neighbors of the given vertex.
 // Thus, all edges have `.Target == source`.
-func UpstreamNeighbors[K comparable, T any](g GraphRead[K, T], source K) func(yield func(Edge[K], error) bool) {
+func UpstreamNeighbors[K comparable, V any, E any](g GraphRead[K, V, E], source K) func(yield func(Edge[K, E], error) bool) {
 	if rel, ok := g.(interface {
-		UpstreamNeighbors(K) func(yield func(Edge[K], error) bool)
+		UpstreamNeighbors(K) func(yield func(Edge[K, E], error) bool)
 	}); ok {
 		return rel.UpstreamNeighbors(source)
 	}
 
-	return func(yield func(Edge[K], error) bool) {
+	return func(yield func(Edge[K, E], error) bool) {
 		pred, err := PredecessorMap(g)
 		if err != nil {
-			yield(Edge[K]{}, err)
+			yield(Edge[K, E]{}, err)
 			return
 		}
 		for _, preds := range pred {
@@ -70,8 +70,8 @@ type (
 	// just the current path.
 	WalkGraphFunc[K comparable] func(p Path[K], nerr error) error
 
-	GraphWalker[K comparable] interface {
-		Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(Edge[K], Edge[K]) bool) error
+	GraphWalker[K comparable, E any] interface {
+		Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(Edge[K, E], Edge[K, E]) bool) error
 	}
 
 	WalkDirection bool
@@ -93,17 +93,17 @@ var (
 // If a loop is encountered, it is skipped.
 // Note: the `Path` argument to the callback function is reused on subsequent calls,
 // so do not store it directly anywhere, instead make a copy if you need to keep it.
-func WalkPaths[K comparable, T any](g GraphRead[K, T], dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K]) error {
+func WalkPaths[K comparable, V any, E any](g GraphRead[K, V, E], dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K]) error {
 	return WalkPathsStable(g, dir, order, start, f, nil)
 }
 
 // WalkPathsStable is like [WalkPaths] but will sort the neighbors of each vertex before adding them, to ensure
 // a stable order of traversal.
-func WalkPathsStable[K comparable, T any](g GraphRead[K, T], dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(Edge[K], Edge[K]) bool) error {
-	if walker, ok := g.(GraphWalker[K]); ok {
+func WalkPathsStable[K comparable, V any, E any](g GraphRead[K, V, E], dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(Edge[K, E], Edge[K, E]) bool) error {
+	if walker, ok := g.(GraphWalker[K, E]); ok {
 		return walker.Walk(dir, order, start, f, less)
 	}
-	var deps map[K]map[K]Edge[K]
+	var deps map[K]map[K]Edge[K, E]
 	var err error
 	if dir == WalkDirectionDown {
 		deps, err = AdjacencyMap(g)
@@ -116,11 +116,11 @@ func WalkPathsStable[K comparable, T any](g GraphRead[K, T], dir WalkDirection, 
 	return walk(deps, order, start, f, less)
 }
 
-func EdgeWeightLess(e1, e2 Edge[int]) bool {
+func EdgeWeightLess[K comparable, E any](e1, e2 Edge[K, E]) bool {
 	return e1.Properties.Weight < e2.Properties.Weight
 }
 
-// ET is either `Edge[K]` (when used with [AdjacencyMap] or [PredecessorMap]) or `*Edge[K]` (used internally for memoryGraph implementation)
+// ET is either `Edge[K, E]` (when used with [AdjacencyMap] or [PredecessorMap]) or `*Edge[K, E]` (used internally for memoryGraph implementation)
 func walk[K comparable, ET any](
 	deps map[K]map[K]ET,
 	order WalkOrder,

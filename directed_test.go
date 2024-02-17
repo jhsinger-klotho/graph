@@ -132,20 +132,20 @@ func TestDirected_Vertex(t *testing.T) {
 func TestDirected_RemoveVertex(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []int
-		edges         []Edge[int]
+		edges         []Edge[int, any]
 		vertex        int
 		expectedError error
 	}{
 		"existing disconnected vertex": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 2, Target: 3},
 			},
 			vertex: 1,
 		},
 		"existing connected vertex": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 2, Target: 3},
 			},
@@ -154,7 +154,7 @@ func TestDirected_RemoveVertex(t *testing.T) {
 		},
 		"non-existent vertex": {
 			vertices:      []int{1, 2, 3},
-			edges:         []Edge[int]{},
+			edges:         []Edge[int, any]{},
 			vertex:        4,
 			expectedError: ErrVertexNotFound,
 		},
@@ -174,33 +174,33 @@ func TestDirected_RemoveVertex(t *testing.T) {
 func TestDirected_AddEdge(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []int
-		edges         []Edge[int]
-		expectedEdges []Edge[int]
+		edges         []Edge[int, any]
+		expectedEdges []Edge[int, any]
 		// Even though some AddVertex calls might work, at least one of them
 		// could fail, e.g. if the last call would introduce a cycle.
 		finallyExpectedError error
 	}{
 		"graph with 2 edges": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
-				{Source: 1, Target: 2, Properties: EdgeProperties{Weight: 10}},
-				{Source: 1, Target: 3, Properties: EdgeProperties{Weight: 20}},
+			edges: []Edge[int, any]{
+				{Source: 1, Target: 2, Properties: EdgeProperties[any]{Weight: 10}},
+				{Source: 1, Target: 3, Properties: EdgeProperties[any]{Weight: 20}},
 			},
-			expectedEdges: []Edge[int]{
-				{Source: 1, Target: 2, Properties: EdgeProperties{Weight: 10}},
-				{Source: 1, Target: 3, Properties: EdgeProperties{Weight: 20}},
+			expectedEdges: []Edge[int, any]{
+				{Source: 1, Target: 2, Properties: EdgeProperties[any]{Weight: 10}},
+				{Source: 1, Target: 3, Properties: EdgeProperties[any]{Weight: 20}},
 			},
 		},
 		"hashes for non-existent vertices": {
 			vertices: []int{1, 2},
-			edges: []Edge[int]{
-				{Source: 1, Target: 3, Properties: EdgeProperties{Weight: 20}},
+			edges: []Edge[int, any]{
+				{Source: 1, Target: 3, Properties: EdgeProperties[any]{Weight: 20}},
 			},
 			finallyExpectedError: ErrVertexNotFound,
 		},
 		"edge already exists": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 2, Target: 3},
 				{Source: 3, Target: 1},
@@ -210,22 +210,22 @@ func TestDirected_AddEdge(t *testing.T) {
 		},
 		"edge with attributes": {
 			vertices: []int{1, 2},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{
 					Source: 1,
 					Target: 2,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Attributes: map[string]string{
 							"color": "red",
 						},
 					},
 				},
 			},
-			expectedEdges: []Edge[int]{
+			expectedEdges: []Edge[int, any]{
 				{
 					Source: 1,
 					Target: 2,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Attributes: map[string]string{
 							"color": "red",
 						},
@@ -235,20 +235,20 @@ func TestDirected_AddEdge(t *testing.T) {
 		},
 		"edge with data": {
 			vertices: []int{1, 2},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{
 					Source: 1,
 					Target: 2,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Data: "foo",
 					},
 				},
 			},
-			expectedEdges: []Edge[int]{
+			expectedEdges: []Edge[int, any]{
 				{
 					Source: 1,
 					Target: 2,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Data: "foo",
 					},
 				},
@@ -292,33 +292,33 @@ func TestDirected_AddEdge(t *testing.T) {
 func TestDirected_Edge(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []int
-		edge          Edge[int]
+		edge          Edge[int, any]
 		args          [2]int
 		expectedError error
 	}{
 		"get edge of undirected graph": {
 			vertices: []int{1, 2, 3},
-			edge:     Edge[int]{Source: 1, Target: 2},
+			edge:     Edge[int, any]{Source: 1, Target: 2},
 			args:     [2]int{1, 2},
 		},
 		"get edge of undirected graph with swapped source and target": {
 			vertices:      []int{1, 2, 3},
-			edge:          Edge[int]{Source: 1, Target: 2},
+			edge:          Edge[int, any]{Source: 1, Target: 2},
 			args:          [2]int{2, 1},
 			expectedError: ErrEdgeNotFound,
 		},
 		"get non-existent edge of undirected graph": {
 			vertices:      []int{1, 2, 3},
-			edge:          Edge[int]{Source: 1, Target: 2},
+			edge:          Edge[int, any]{Source: 1, Target: 2},
 			args:          [2]int{2, 3},
 			expectedError: ErrEdgeNotFound,
 		},
 		"get edge with properties": {
 			vertices: []int{1, 2, 3},
-			edge: Edge[int]{
+			edge: Edge[int, any]{
 				Source: 1,
 				Target: 2,
-				Properties: EdgeProperties{
+				Properties: EdgeProperties[any]{
 					// Attributes can't be tested at the moment, because there
 					// is no way to add multiple attributes at once (using a
 					// functional option like EdgeAttributes).
@@ -333,7 +333,7 @@ func TestDirected_Edge(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		graph := newTestGraph(test.vertices, []Edge[int]{test.edge})
+		graph := newTestGraph(test.vertices, []Edge[int, any]{test.edge})
 
 		edge, err := graph.Edge(test.args[0], test.args[1])
 
@@ -362,16 +362,16 @@ func TestDirected_Edge(t *testing.T) {
 func TestDirected_Edges(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []int
-		edges         []Edge[int]
-		expectedEdges []Edge[int]
+		edges         []Edge[int, any]
+		expectedEdges []Edge[int, any]
 	}{
 		"graph with 3 edges": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{
 					Source: 1,
 					Target: 2,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Weight: 10,
 						Attributes: map[string]string{
 							"color": "red",
@@ -381,7 +381,7 @@ func TestDirected_Edges(t *testing.T) {
 				{
 					Source: 2,
 					Target: 3,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Weight: 20,
 						Attributes: map[string]string{
 							"color": "green",
@@ -391,7 +391,7 @@ func TestDirected_Edges(t *testing.T) {
 				{
 					Source: 3,
 					Target: 1,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Weight: 30,
 						Attributes: map[string]string{
 							"color": "blue",
@@ -399,11 +399,11 @@ func TestDirected_Edges(t *testing.T) {
 					},
 				},
 			},
-			expectedEdges: []Edge[int]{
+			expectedEdges: []Edge[int, any]{
 				{
 					Source: 1,
 					Target: 2,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Weight: 10,
 						Attributes: map[string]string{
 							"color": "red",
@@ -413,7 +413,7 @@ func TestDirected_Edges(t *testing.T) {
 				{
 					Source: 2,
 					Target: 3,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Weight: 20,
 						Attributes: map[string]string{
 							"color": "green",
@@ -423,7 +423,7 @@ func TestDirected_Edges(t *testing.T) {
 				{
 					Source: 3,
 					Target: 1,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Weight: 30,
 						Attributes: map[string]string{
 							"color": "blue",
@@ -443,7 +443,7 @@ func TestDirected_Edges(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			g := newTestGraph(test.vertices, test.edges)
 
-			edges := make(map[EdgeKey]Edge[int])
+			edges := make(map[EdgeKey]Edge[int, any])
 			for e, _ := range g.Edges() {
 				edges[EdgeKey{S: e.Source, T: e.Target}] = e
 			}
@@ -461,17 +461,17 @@ func TestDirected_Edges(t *testing.T) {
 func TestDirected_UpdateEdge(t *testing.T) {
 	tests := map[string]struct {
 		vertices    []int
-		edges       []Edge[int]
-		updateEdge  Edge[int]
+		edges       []Edge[int, any]
+		updateEdge  Edge[int, any]
 		expectedErr error
 	}{
 		"update an edge": {
 			vertices: []int{1, 2},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{
 					Source: 1,
 					Target: 2,
-					Properties: EdgeProperties{
+					Properties: EdgeProperties[any]{
 						Weight: 10,
 						Attributes: map[string]string{
 							"color": "red",
@@ -480,10 +480,10 @@ func TestDirected_UpdateEdge(t *testing.T) {
 					},
 				},
 			},
-			updateEdge: Edge[int]{
+			updateEdge: Edge[int, any]{
 				Source: 1,
 				Target: 2,
-				Properties: EdgeProperties{
+				Properties: EdgeProperties[any]{
 					Weight: 20,
 					Attributes: map[string]string{
 						"color": "blue",
@@ -520,37 +520,37 @@ func TestDirected_UpdateEdge(t *testing.T) {
 func TestDirected_RemoveEdge(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []int
-		edges         []Edge[int]
-		removeEdges   []Edge[int]
+		edges         []Edge[int, any]
+		removeEdges   []Edge[int, any]
 		expectedError error
 	}{
 		"two-vertices graph": {
 			vertices: []int{1, 2},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 			},
-			removeEdges: []Edge[int]{
+			removeEdges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 			},
 		},
 		"remove 2 edges from triangle": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 3},
 			},
-			removeEdges: []Edge[int]{
+			removeEdges: []Edge[int, any]{
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 3},
 			},
 		},
 		"remove non-existent edge": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 			},
-			removeEdges: []Edge[int]{
+			removeEdges: []Edge[int, any]{
 				{Source: 2, Target: 3},
 			},
 			expectedError: ErrEdgeNotFound,
@@ -576,17 +576,17 @@ func TestDirected_RemoveEdge(t *testing.T) {
 func TestDirected_AdjacencyList(t *testing.T) {
 	tests := map[string]struct {
 		vertices []int
-		edges    []Edge[int]
-		expected map[int]map[int]Edge[int]
+		edges    []Edge[int, any]
+		expected map[int]map[int]Edge[int, any]
 	}{
 		"Y-shaped graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 3},
 				{Source: 3, Target: 4},
 			},
-			expected: map[int]map[int]Edge[int]{
+			expected: map[int]map[int]Edge[int, any]{
 				1: {
 					3: {Source: 1, Target: 3},
 				},
@@ -601,13 +601,13 @@ func TestDirected_AdjacencyList(t *testing.T) {
 		},
 		"diamond-shaped graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
 				{Source: 3, Target: 4},
 			},
-			expected: map[int]map[int]Edge[int]{
+			expected: map[int]map[int]Edge[int, any]{
 				1: {
 					2: {Source: 1, Target: 2},
 					3: {Source: 1, Target: 3},
@@ -650,17 +650,17 @@ func TestDirected_AdjacencyList(t *testing.T) {
 func TestDirected_PredecessorMap(t *testing.T) {
 	tests := map[string]struct {
 		vertices []int
-		edges    []Edge[int]
-		expected map[int]map[int]Edge[int]
+		edges    []Edge[int, any]
+		expected map[int]map[int]Edge[int, any]
 	}{
 		"Y-shaped graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 3},
 				{Source: 3, Target: 4},
 			},
-			expected: map[int]map[int]Edge[int]{
+			expected: map[int]map[int]Edge[int, any]{
 				1: {},
 				2: {},
 				3: {
@@ -674,13 +674,13 @@ func TestDirected_PredecessorMap(t *testing.T) {
 		},
 		"diamond-shaped graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
 				{Source: 3, Target: 4},
 			},
-			expected: map[int]map[int]Edge[int]{
+			expected: map[int]map[int]Edge[int, any]{
 				1: {},
 				2: {
 					1: {Source: 1, Target: 2},
@@ -723,13 +723,13 @@ func TestDirected_PredecessorMap(t *testing.T) {
 func TestDirected_OrderAndSize(t *testing.T) {
 	tests := map[string]struct {
 		vertices      []int
-		edges         []Edge[int]
+		edges         []Edge[int, any]
 		expectedOrder int
 		expectedSize  int
 	}{
 		"Y-shaped graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 3},
 				{Source: 3, Target: 4},
@@ -739,7 +739,7 @@ func TestDirected_OrderAndSize(t *testing.T) {
 		},
 		"diamond-shaped graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -750,7 +750,7 @@ func TestDirected_OrderAndSize(t *testing.T) {
 		},
 		"two-vertices two-edges graph": {
 			vertices: []int{1, 2},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 2, Target: 1},
 			},
@@ -759,7 +759,7 @@ func TestDirected_OrderAndSize(t *testing.T) {
 		},
 		"edgeless graph": {
 			vertices:      []int{1, 2},
-			edges:         []Edge[int]{},
+			edges:         []Edge[int, any]{},
 			expectedOrder: 2,
 			expectedSize:  0,
 		},
@@ -785,19 +785,19 @@ func TestDirected_OrderAndSize(t *testing.T) {
 func TestDirected_DownstreamNeighbors(t *testing.T) {
 	tests := map[string]struct {
 		vertices []int
-		edges    []Edge[int]
+		edges    []Edge[int, any]
 		start    int
 		expected []int
 	}{
 		"no neighbors": {
 			vertices: []int{1, 2, 3, 4},
-			edges:    []Edge[int]{},
+			edges:    []Edge[int, any]{},
 			start:    1,
 			expected: []int{},
 		},
 		"diamond-shaped graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -829,19 +829,19 @@ func TestDirected_DownstreamNeighbors(t *testing.T) {
 func TestDirected_UpstreamNeighbors(t *testing.T) {
 	tests := map[string]struct {
 		vertices []int
-		edges    []Edge[int]
+		edges    []Edge[int, any]
 		start    int
 		expected []int
 	}{
 		"no neighbors": {
 			vertices: []int{1, 2, 3, 4},
-			edges:    []Edge[int]{},
+			edges:    []Edge[int, any]{},
 			start:    1,
 			expected: []int{},
 		},
 		"diamond-shaped graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -873,7 +873,7 @@ func TestDirected_UpstreamNeighbors(t *testing.T) {
 func TestDirected_Walk(t *testing.T) {
 	tests := map[string]struct {
 		vertices  []int
-		edges     []Edge[int]
+		edges     []Edge[int, any]
 		direction WalkDirection
 		start     int
 		walkErr   map[int]error
@@ -882,14 +882,14 @@ func TestDirected_Walk(t *testing.T) {
 	}{
 		"no connections": {
 			vertices: []int{1, 2, 3, 4},
-			edges:    []Edge[int]{},
+			edges:    []Edge[int, any]{},
 			start:    1,
 		},
 		"diamond-shaped graph/down": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
-				{Source: 1, Target: 2, Properties: EdgeProperties{Weight: 1}},
-				{Source: 1, Target: 3, Properties: EdgeProperties{Weight: 2}},
+			edges: []Edge[int, any]{
+				{Source: 1, Target: 2, Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: 1, Target: 3, Properties: EdgeProperties[any]{Weight: 2}},
 				{Source: 2, Target: 4},
 				{Source: 3, Target: 4},
 			},
@@ -910,11 +910,11 @@ func TestDirected_Walk(t *testing.T) {
 		},
 		"diamond-shaped graph/up": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
-				{Source: 2, Target: 4, Properties: EdgeProperties{Weight: 1}},
-				{Source: 3, Target: 4, Properties: EdgeProperties{Weight: 2}},
+				{Source: 2, Target: 4, Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: 3, Target: 4, Properties: EdgeProperties[any]{Weight: 2}},
 			},
 			start:     4,
 			direction: WalkDirectionUp,
@@ -933,10 +933,10 @@ func TestDirected_Walk(t *testing.T) {
 		},
 		"skip path": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
-				{Source: 2, Target: 3, Properties: EdgeProperties{Weight: 1}},
-				{Source: 2, Target: 4, Properties: EdgeProperties{Weight: 2}},
+				{Source: 2, Target: 3, Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: 2, Target: 4, Properties: EdgeProperties[any]{Weight: 2}},
 				{Source: 3, Target: 4},
 			},
 			start:     1,
@@ -957,10 +957,10 @@ func TestDirected_Walk(t *testing.T) {
 		},
 		"skip all": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
-				{Source: 2, Target: 3, Properties: EdgeProperties{Weight: 1}},
-				{Source: 2, Target: 4, Properties: EdgeProperties{Weight: 2}},
+				{Source: 2, Target: 3, Properties: EdgeProperties[any]{Weight: 1}},
+				{Source: 2, Target: 4, Properties: EdgeProperties[any]{Weight: 2}},
 				{Source: 3, Target: 4},
 			},
 			start:     1,
@@ -1033,7 +1033,7 @@ func slicesAreEqual[T comparable](a, b []T) bool {
 	return true
 }
 
-func edgesAreEqual[K comparable](a, b Edge[K], directed bool) bool {
+func edgesAreEqual[K comparable, E any](a, b Edge[K, E], directed bool) bool {
 	directedOk := a.Source == b.Source &&
 		a.Target == b.Target
 
@@ -1076,8 +1076,8 @@ func edgesAreEqual[K comparable](a, b Edge[K], directed bool) bool {
 	return true
 }
 
-func newTestGraph(vertices []int, edges []Edge[int]) *memoryGraph[int, int] {
-	g := NewMemoryGraph(IntHash, Directed())
+func newTestGraph(vertices []int, edges []Edge[int, any]) *memoryGraph[int, int, any] {
+	g := NewMemoryGraph[int, int, any](IntHash, Directed())
 
 	for _, vertex := range vertices {
 		_ = g.AddVertex(vertex)

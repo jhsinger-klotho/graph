@@ -12,11 +12,11 @@ var ErrTargetNotReachable = errors.New("target vertex not reachable from source"
 
 type Path[K comparable] []K
 
-func PathWeight[K comparable, V any](g Graph[K, V], path Path[K]) (weight float64, err error) {
+func PathWeight[K comparable, V any, E any](g Graph[K, V, E], path Path[K]) (weight float64, err error) {
 	verticesWeighted, edgesWeighted := g.Traits().IsWeighted()
 
 	for i := 1; i < len(path)-1; i++ {
-		var e Edge[K]
+		var e Edge[K, E]
 		e, err = g.Edge(path[i-1], path[i])
 		if err != nil {
 			err = fmt.Errorf("edge(path[%d], path[%d]): %w", i-1, i, err)
@@ -60,7 +60,7 @@ type GraphCycles[K comparable] interface {
 //
 // A potential edge would create a cycle if the target vertex is also a parent
 // of the source vertex. In order to determine this, CreatesCycle runs a DFS.
-func CreatesCycle[K comparable, T any](g GraphRead[K, T], source, target K) (bool, error) {
+func CreatesCycle[K comparable, V any, E any](g GraphRead[K, V, E], source, target K) (bool, error) {
 	if cycler, ok := g.(GraphCycles[K]); ok {
 		return cycler.CreatesCycle(source, target)
 	}
@@ -112,14 +112,14 @@ type ShortestPather[K comparable] interface {
 // there be multiple shortest paths, and arbitrary one will be returned.
 //
 // ShortestPath has a time complexity of O(|V|+|E|log(|V|)).
-func ShortestPath[K comparable, T any](g GraphRead[K, T], source, target K) (Path[K], error) {
+func ShortestPath[K comparable, V any, E any](g GraphRead[K, V, E], source, target K) (Path[K], error) {
 	if g.Traits().IsDirected {
 		return BellmanFordShortestPath(g, source, nil).ShortestPath(target)
 	}
 	return DijkstraShortestPath(g, source).ShortestPath(target)
 }
 
-func ShortestPathStable[K comparable, T any](g GraphRead[K, T], source, target K, less func(a, b K) bool) (Path[K], error) {
+func ShortestPathStable[K comparable, V any, E any](g GraphRead[K, V, E], source, target K, less func(a, b K) bool) (Path[K], error) {
 	return BellmanFordShortestPath(g, source, less).ShortestPath(target)
 }
 
@@ -152,8 +152,8 @@ func (b errShortestPath[K]) ShortestPath(target K) (Path[K], error) {
 	return nil, b.err
 }
 
-func DijkstraShortestPath[K comparable, T any](g GraphRead[K, T], source K) ShortestPather[K] {
-	adjacencyMap, err := AdjacencyMap[K, T](g)
+func DijkstraShortestPath[K comparable, V any, E any](g GraphRead[K, V, E], source K) ShortestPather[K] {
+	adjacencyMap, err := AdjacencyMap[K, V](g)
 	if err != nil {
 		return errShortestPath[K]{err: fmt.Errorf("could not get adjacency map: %w", err)}
 	}
@@ -221,11 +221,11 @@ func DijkstraShortestPath[K comparable, T any](g GraphRead[K, T], source K) Shor
 //
 // The returned path includes the source and target vertices. If the target cannot be reached
 // from the source vertex, ErrTargetNotReachable will be returned. If there are multiple shortest
-func BellmanFordShortestPath[K comparable, T any](g GraphRead[K, T], source K, less func(a, b K) bool) ShortestPather[K] {
+func BellmanFordShortestPath[K comparable, V any, E any](g GraphRead[K, V, E], source K, less func(a, b K) bool) ShortestPather[K] {
 	dist := make(map[K]float64)
 	bestPredecessors := make(map[K]K)
 
-	adjacencyMap, err := AdjacencyMap[K, T](g)
+	adjacencyMap, err := AdjacencyMap[K, V](g)
 	if err != nil {
 		return errShortestPath[K]{err: fmt.Errorf("could not get adjacency map: %w", err)}
 	}
@@ -291,8 +291,8 @@ func BellmanFordShortestPath[K comparable, T any](g GraphRead[K, T], source K, l
 	}
 }
 
-type sccState[K comparable] struct {
-	adjacencyMap map[K]map[K]Edge[K]
+type sccState[K comparable, E any] struct {
+	adjacencyMap map[K]map[K]Edge[K, E]
 	components   [][]K
 	stack        *stack[K]
 	visited      map[K]struct{}
@@ -306,13 +306,13 @@ type sccState[K comparable] struct {
 // each component is represented by a []K.
 //
 // StronglyConnectedComponents can only run on directed graphs.
-func StronglyConnectedComponents[K comparable, T any](g GraphRead[K, T]) ([][]K, error) {
-	adjacencyMap, err := AdjacencyMap[K, T](g)
+func StronglyConnectedComponents[K comparable, V any, E any](g GraphRead[K, V, E]) ([][]K, error) {
+	adjacencyMap, err := AdjacencyMap[K, V](g)
 	if err != nil {
 		return nil, fmt.Errorf("could not get adjacency map: %w", err)
 	}
 
-	state := &sccState[K]{
+	state := &sccState[K, E]{
 		adjacencyMap: adjacencyMap,
 		components:   make([][]K, 0),
 		stack:        newStack[K](),
@@ -330,7 +330,7 @@ func StronglyConnectedComponents[K comparable, T any](g GraphRead[K, T]) ([][]K,
 	return state.components, nil
 }
 
-func findSCC[K comparable](vertexHash K, state *sccState[K]) {
+func findSCC[K comparable, E any](vertexHash K, state *sccState[K, E]) {
 	state.stack.push(vertexHash)
 	state.visited[vertexHash] = struct{}{}
 	state.index[vertexHash] = state.time
@@ -379,14 +379,18 @@ func findSCC[K comparable](vertexHash K, state *sccState[K]) {
 	}
 }
 
+type GraphAllPaths[K comparable] interface {
+	AllPathsBetween(start, end K) ([]Path[K], error)
+}
+
 // AllPathsBetween computes and returns all paths between two given vertices. A
 // path is represented as a slice of vertex hashes. The returned slice contains
 // these paths.
 //
 // AllPathsBetween utilizes a non-recursive, stack-based implementation. It has
 // an estimated runtime complexity of O(n^2) where n is the number of vertices.
-func AllPathsBetween[K comparable, T any](g GraphRead[K, T], start, end K) ([][]K, error) {
-	adjacencyMap, err := AdjacencyMap[K, T](g)
+func AllPathsBetween[K comparable, V any, E any](g GraphRead[K, V, E], start, end K) ([][]K, error) {
+	adjacencyMap, err := AdjacencyMap[K, V](g)
 	if err != nil {
 		return nil, err
 	}

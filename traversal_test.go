@@ -7,14 +7,14 @@ import (
 func TestDirectedDFS(t *testing.T) {
 	tests := map[string]struct {
 		vertices       []int
-		edges          []Edge[int]
+		edges          []Edge[int, any]
 		startHash      int
 		expectedVisits []int
 		stopAtVertex   int
 	}{
 		"traverse entire directed graph with 3 vertices": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 			},
@@ -24,7 +24,7 @@ func TestDirectedDFS(t *testing.T) {
 		},
 		"traverse entire directed triangle graph": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 2, Target: 3},
 				{Source: 3, Target: 1},
@@ -35,7 +35,7 @@ func TestDirectedDFS(t *testing.T) {
 		},
 		"traverse directed graph with 3 vertices until vertex 2": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 2, Target: 3},
 				{Source: 3, Target: 1},
@@ -46,7 +46,7 @@ func TestDirectedDFS(t *testing.T) {
 		},
 		"traverse a disconnected directed graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 3, Target: 4},
 			},
@@ -86,14 +86,14 @@ func TestDirectedDFS(t *testing.T) {
 func TestDirectedBFS(t *testing.T) {
 	tests := map[string]struct {
 		vertices       []int
-		edges          []Edge[int]
+		edges          []Edge[int, any]
 		startHash      int
 		expectedVisits []int
 		stopAtVertex   int
 	}{
 		"traverse entire graph with 3 vertices": {
 			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 			},
@@ -103,7 +103,7 @@ func TestDirectedBFS(t *testing.T) {
 		},
 		"traverse graph with 6 vertices until vertex 4": {
 			vertices: []int{1, 2, 3, 4, 5, 6},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
@@ -116,7 +116,7 @@ func TestDirectedBFS(t *testing.T) {
 		},
 		"traverse a disconnected graph": {
 			vertices: []int{1, 2, 3, 4},
-			edges: []Edge[int]{
+			edges: []Edge[int, any]{
 				{Source: 1, Target: 2},
 				{Source: 3, Target: 4},
 			},

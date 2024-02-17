@@ -57,30 +57,30 @@ import (
 // Graph represents a generic graph data structure consisting of vertices of
 // type T identified by a hash of type K.
 type (
-	Graph[K comparable, T any] interface {
-		GraphRead[K, T]
-		GraphWrite[K, T]
+	Graph[K comparable, V any, E any] interface {
+		GraphRead[K, V, E]
+		GraphWrite[K, V, E]
 	}
 
-	GraphRead[K comparable, T any] interface {
-		Hash(T) K
+	GraphRead[K comparable, V any, E any] interface {
+		Hash(V) K
 		Traits() Traits
 
 		// Vertex returns the vertex with the given hash or ErrVertexNotFound if it
 		// doesn't exist.
-		Vertex(hash K) (Vertex[T], error)
+		Vertex(hash K) (Vertex[V], error)
 
 		// Vertices returns a slice of all vertices in the graph.
-		Vertices() func(yield func(Vertex[T], error) bool)
+		Vertices() func(yield func(Vertex[V], error) bool)
 
 		// Edge returns the edge joining two given vertices or ErrEdgeNotFound if
 		// the edge doesn't exist. In an undirected graph, an edge with swapped
 		// source and target vertices does match.
-		Edge(sourceHash, targetHash K) (Edge[K], error)
+		Edge(sourceHash, targetHash K) (Edge[K, E], error)
 
 		// Edges returns a slice of all edges in the graph. These edges are of type
 		// Edge[K] and hence will contain the vertex hashes, not the vertex values.
-		Edges() func(yield func(Edge[K], error) bool)
+		Edges() func(yield func(Edge[K, E], error) bool)
 
 		// Order returns the number of vertices in the graph.
 		Order() (int, error)
@@ -89,7 +89,7 @@ type (
 		Size() (int, error)
 	}
 
-	GraphWrite[K comparable, T any] interface {
+	GraphWrite[K comparable, V any, E any] interface {
 		// AddVertex creates a new vertex in the graph. If the vertex already exists
 		// in the graph, ErrVertexAlreadyExists will be returned.
 		//
@@ -98,10 +98,10 @@ type (
 		//
 		//	_ = graph.AddVertex("A", "B", graph.VertexWeight(4), graph.VertexAttribute("label", "my-label"))
 		//
-		AddVertex(value T, options ...func(*VertexProperties)) error
+		AddVertex(value V, options ...func(*VertexProperties)) error
 
 		// UpdateVertex updates the vertex with the given hash value.
-		UpdateVertex(hash K, options ...func(*Vertex[T])) error
+		UpdateVertex(hash K, options ...func(*Vertex[V])) error
 
 		// RemoveVertex removes the vertex with the given hash value from the graph.
 		//
@@ -122,7 +122,7 @@ type (
 		//
 		//	_ = g.AddEdge("A", "B", graph.EdgeWeight(4), graph.EdgeAttribute("label", "my-label"))
 		//
-		AddEdge(sourceHash, targetHash K, options ...func(*EdgeProperties)) error
+		AddEdge(sourceHash, targetHash K, options ...func(*EdgeProperties[E])) error
 
 		// UpdateEdge updates the edge joining the two given vertices with the data
 		// provided in the given functional options. Valid functional options are:
@@ -135,7 +135,7 @@ type (
 		// setting the weight of an edge (A,B) to 10 would look as follows:
 		//
 		//	_ = g.UpdateEdge("A", "B", graph.EdgeWeight(10))
-		UpdateEdge(source, target K, options ...func(properties *EdgeProperties)) error
+		UpdateEdge(source, target K, options ...func(properties *EdgeProperties[E])) error
 
 		// RemoveEdge removes the edge between the given source and target vertices.
 		// If the edge cannot be found, ErrEdgeNotFound will be returned.
@@ -150,10 +150,10 @@ type (
 	// Edge represents an edge that joins two vertices. Even though these edges are
 	// always referred to as source and target, whether the graph is directed or not
 	// is determined by its traits.
-	Edge[T any] struct {
+	Edge[T any, E any] struct {
 		Source     T
 		Target     T
-		Properties EdgeProperties
+		Properties EdgeProperties[E]
 	}
 
 	// EdgeProperties represents a set of properties that each edge possesses. They
@@ -163,10 +163,10 @@ type (
 	//
 	// The example above will create an edge with a weight of 2 and an attribute
 	// "color" with value "red".
-	EdgeProperties struct {
+	EdgeProperties[E any] struct {
 		Attributes map[string]string
 		Weight     float64
-		Data       any
+		Data       E
 	}
 
 	// Hash is a hashing function that takes a vertex of type T and returns a hash
@@ -200,8 +200,8 @@ func IntHash(v int) int {
 // EdgeWeight returns a function that sets the weight of an edge to the given
 // weight. This is a functional option for the [graph.Graph.Edge] and
 // [graph.Graph.AddEdge] methods.
-func EdgeWeight(weight float64) func(*EdgeProperties) {
-	return func(e *EdgeProperties) {
+func EdgeWeight[E any](weight float64) func(*EdgeProperties[E]) {
+	return func(e *EdgeProperties[E]) {
 		e.Weight = weight
 	}
 }
@@ -209,8 +209,8 @@ func EdgeWeight(weight float64) func(*EdgeProperties) {
 // EdgeAttribute returns a function that adds the given key-value pair to the
 // attributes of an edge. This is a functional option for the [graph.Graph.Edge]
 // and [graph.Graph.AddEdge] methods.
-func EdgeAttribute(key, value string) func(*EdgeProperties) {
-	return func(e *EdgeProperties) {
+func EdgeAttribute[E any](key, value string) func(*EdgeProperties[E]) {
+	return func(e *EdgeProperties[E]) {
 		if e.Attributes == nil {
 			e.Attributes = make(map[string]string)
 		}
@@ -221,8 +221,8 @@ func EdgeAttribute(key, value string) func(*EdgeProperties) {
 // EdgeAttributes returns a function that sets the given map as the attributes
 // of an edge. This is a functional option for the [graph.Graph.AddEdge] and
 // [graph.Graph.UpdateEdge] methods.
-func EdgeAttributes(attributes map[string]string) func(*EdgeProperties) {
-	return func(e *EdgeProperties) {
+func EdgeAttributes[E any](attributes map[string]string) func(*EdgeProperties[E]) {
+	return func(e *EdgeProperties[E]) {
 		e.Attributes = attributes
 	}
 }
@@ -230,8 +230,8 @@ func EdgeAttributes(attributes map[string]string) func(*EdgeProperties) {
 // EdgeData returns a function that sets the data of an edge to the given value.
 // This is a functional option for the [graph.Graph.Edge] and
 // [graph.Graph.AddEdge] methods.
-func EdgeData(data any) func(*EdgeProperties) {
-	return func(e *EdgeProperties) {
+func EdgeData[E any](data E) func(*EdgeProperties[E]) {
+	return func(e *EdgeProperties[E]) {
 		e.Data = data
 	}
 }
@@ -239,8 +239,8 @@ func EdgeData(data any) func(*EdgeProperties) {
 // EdgeCopyProperties makes a copy (shallow for .Data) of the given properties and returns a
 // 'option'-style function that can be used in the [graph.Graph.AddEdge] and
 // [graph.Graph.UpdateEdge] methods.
-func EdgeCopyProperties(properties EdgeProperties) func(*EdgeProperties) {
-	return func(e *EdgeProperties) {
+func EdgeCopyProperties[E any](properties EdgeProperties[E]) func(*EdgeProperties[E]) {
+	return func(e *EdgeProperties[E]) {
 		if e.Attributes == nil {
 			e.Attributes = make(map[string]string)
 		}
@@ -256,7 +256,7 @@ func EdgeCopyProperties(properties EdgeProperties) func(*EdgeProperties) {
 // which can be used as arguments to [graph.Graph.AddEdge]
 //
 //	err := g.AddEdge(EdgeCopy(e))
-func EdgeCopy[K comparable](e Edge[K]) (K, K, func(*EdgeProperties)) {
+func EdgeCopy[K comparable, E any](e Edge[K, E]) (K, K, func(*EdgeProperties[E])) {
 	return e.Source, e.Target, EdgeCopyProperties(e.Properties)
 }
 
@@ -324,11 +324,11 @@ func VertexCopy[T any](v Vertex[T]) (T, func(*VertexProperties)) {
 	return v.Value, VertexCopyProperties(v.Properties)
 }
 
-func EdgesEqual[K comparable, T any](hash Hash[K, T], a, b Edge[T]) bool {
+func EdgesEqual[K comparable, T any, E any](hash Hash[K, T], a, b Edge[T, E]) bool {
 	return hash(a.Source) == hash(b.Source) && hash(a.Target) == hash(b.Target)
 }
 
-func CopyTo[K comparable, T any](from GraphRead[K, T], to GraphWrite[K, T]) error {
+func CopyTo[K comparable, T any, E any](from GraphRead[K, T, E], to GraphWrite[K, T, E]) error {
 	for v, err := range from.Vertices() {
 		if err != nil {
 			return err
@@ -355,27 +355,27 @@ func CopyTo[K comparable, T any](from GraphRead[K, T], to GraphWrite[K, T]) erro
 // EdgeT calls the [graph.Graph.Edge] method and returns the result as an
 // [Edge[T]] instead of an [Edge[K]]. This is useful when you want to work with
 // the actual vertex values instead of their hash values.
-func EdgeT[K comparable, T any](g GraphRead[K, T], source, target K) (Edge[T], error) {
+func EdgeT[K comparable, T any, E any](g GraphRead[K, T, E], source, target K) (edge Edge[T, E], err error) {
 	e, err := g.Edge(source, target)
 	if err != nil {
-		return Edge[T]{}, err
+		return edge, err
 	}
 	sourceV, err := g.Vertex(source)
 	if err != nil {
-		return Edge[T]{}, fmt.Errorf("failed to get source vertex: %w", err)
+		return edge, fmt.Errorf("failed to get source vertex: %w", err)
 	}
 	targetV, err := g.Vertex(target)
 	if err != nil {
-		return Edge[T]{}, fmt.Errorf("failed to get target vertex: %w", err)
+		return edge, fmt.Errorf("failed to get target vertex: %w", err)
 	}
-	return Edge[T]{
+	return Edge[T, E]{
 		Source:     sourceV.Value,
 		Target:     targetV.Value,
 		Properties: e.Properties,
 	}, nil
 }
 
-func KeysToString[K comparable, T any](g GraphRead[K, T]) (string, error) {
+func KeysToString[K comparable, V any, E any](g GraphRead[K, V, E]) (string, error) {
 	adj, err := AdjacencyMap(g)
 	if err != nil {
 		return "", err

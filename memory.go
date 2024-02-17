@@ -5,30 +5,30 @@ import (
 )
 
 type (
-	memoryGraph[K comparable, T any] struct {
+	memoryGraph[K comparable, V any, E any] struct {
 		traits Traits
-		hash   Hash[K, T]
+		hash   Hash[K, V]
 		mu     sync.RWMutex
 
-		vertices  map[K]*Vertex[T]
-		outEdges  map[K]map[K]*Edge[K] // source -> target
-		inEdges   map[K]map[K]*Edge[K] // target -> source
+		vertices  map[K]*Vertex[V]
+		outEdges  map[K]map[K]*Edge[K, E] // source -> target
+		inEdges   map[K]map[K]*Edge[K, E] // target -> source
 		edgeCount int
 	}
 )
 
 var (
-	_ Graph[string, string]  = (*memoryGraph[string, string])(nil)
-	_ GraphRelations[string] = (*memoryGraph[string, string])(nil)
-	_ GraphCycles[string]    = (*memoryGraph[string, string])(nil)
+	_ Graph[string, string, string]  = (*memoryGraph[string, string, string])(nil)
+	_ GraphRelations[string, string] = (*memoryGraph[string, string, string])(nil)
+	_ GraphCycles[string]            = (*memoryGraph[string, string, string])(nil)
 )
 
-func NewMemoryGraph[K comparable, T any](hash Hash[K, T], options ...func(*Traits)) *memoryGraph[K, T] {
-	g := &memoryGraph[K, T]{
+func NewMemoryGraph[K comparable, V any, E any](hash Hash[K, V], options ...func(*Traits)) *memoryGraph[K, V, E] {
+	g := &memoryGraph[K, V, E]{
 		hash:     hash,
-		vertices: make(map[K]*Vertex[T]),
-		outEdges: make(map[K]map[K]*Edge[K]),
-		inEdges:  make(map[K]map[K]*Edge[K]),
+		vertices: make(map[K]*Vertex[V]),
+		outEdges: make(map[K]map[K]*Edge[K, E]),
+		inEdges:  make(map[K]map[K]*Edge[K, E]),
 	}
 	for _, option := range options {
 		option(&g.traits)
@@ -36,28 +36,28 @@ func NewMemoryGraph[K comparable, T any](hash Hash[K, T], options ...func(*Trait
 	return g
 }
 
-func (s *memoryGraph[K, T]) Traits() Traits {
+func (s *memoryGraph[K, V, E]) Traits() Traits {
 	return s.traits
 }
 
-func (s *memoryGraph[K, T]) Hash(v T) K {
+func (s *memoryGraph[K, V, E]) Hash(v V) K {
 	return s.hash(v)
 }
 
-func (s *memoryGraph[K, T]) Vertex(hash K) (Vertex[T], error) {
+func (s *memoryGraph[K, V, E]) Vertex(hash K) (Vertex[V], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	v := s.vertices[hash]
 	if v == nil {
-		return Vertex[T]{}, &VertexNotFoundError[K]{Key: hash}
+		return Vertex[V]{}, &VertexNotFoundError[K]{Key: hash}
 	}
 	return *v, nil
 }
 
-func (s *memoryGraph[K, T]) Vertices() func(yield func(Vertex[T], error) bool) {
+func (s *memoryGraph[K, V, E]) Vertices() func(yield func(Vertex[V], error) bool) {
 	s.mu.RLock()
 
-	return func(yield func(Vertex[T], error) bool) {
+	return func(yield func(Vertex[V], error) bool) {
 		defer s.mu.RUnlock()
 
 		for _, v := range s.vertices {
@@ -69,7 +69,7 @@ func (s *memoryGraph[K, T]) Vertices() func(yield func(Vertex[T], error) bool) {
 }
 
 // edge assumes the caller is holding a read lock
-func (s *memoryGraph[K, T]) edge(source, target K) *Edge[K] {
+func (s *memoryGraph[K, V, E]) edge(source, target K) *Edge[K, E] {
 	if edges, ok := s.outEdges[source]; ok {
 		if edge, ok := edges[target]; ok {
 			return edge
@@ -85,12 +85,12 @@ func (s *memoryGraph[K, T]) edge(source, target K) *Edge[K] {
 	return nil
 }
 
-func (s *memoryGraph[K, T]) Edge(sourceHash, targetHash K) (Edge[K], error) {
+func (s *memoryGraph[K, V, E]) Edge(sourceHash, targetHash K) (Edge[K, E], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	e := s.edge(sourceHash, targetHash)
 	if e == nil {
-		return Edge[K]{}, &EdgeNotFoundError[K]{Source: sourceHash, Target: targetHash}
+		return Edge[K, E]{}, &EdgeNotFoundError[K]{Source: sourceHash, Target: targetHash}
 	}
 	edge := *e
 	edge.Source = sourceHash
@@ -98,9 +98,9 @@ func (s *memoryGraph[K, T]) Edge(sourceHash, targetHash K) (Edge[K], error) {
 	return edge, nil
 }
 
-func (s *memoryGraph[K, T]) Edges() func(yield func(Edge[K], error) bool) {
+func (s *memoryGraph[K, V, E]) Edges() func(yield func(Edge[K, E], error) bool) {
 	s.mu.RLock()
-	return func(yield func(Edge[K], error) bool) {
+	return func(yield func(Edge[K, E], error) bool) {
 		defer s.mu.RUnlock()
 
 		for _, out := range s.outEdges {
@@ -113,21 +113,21 @@ func (s *memoryGraph[K, T]) Edges() func(yield func(Edge[K], error) bool) {
 	}
 }
 
-func (s *memoryGraph[K, T]) Order() (int, error) {
+func (s *memoryGraph[K, V, E]) Order() (int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.vertices), nil
 }
 
-func (s *memoryGraph[K, T]) Size() (int, error) {
+func (s *memoryGraph[K, V, E]) Size() (int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.edgeCount, nil
 }
 
-func (s *memoryGraph[K, T]) AddVertex(value T, options ...func(*VertexProperties)) error {
+func (s *memoryGraph[K, V, E]) AddVertex(value V, options ...func(*VertexProperties)) error {
 	k := s.hash(value)
-	v := &Vertex[T]{Value: value}
+	v := &Vertex[V]{Value: value}
 	for _, option := range options {
 		option(&v.Properties)
 	}
@@ -140,7 +140,7 @@ func (s *memoryGraph[K, T]) AddVertex(value T, options ...func(*VertexProperties
 	}
 
 	if existing, ok := s.vertices[k]; ok {
-		return &VertexAlreadyExistsError[K, T]{Key: k, ExistingValue: *existing}
+		return &VertexAlreadyExistsError[K, V]{Key: k, ExistingValue: *existing}
 	}
 
 	s.vertices[k] = v
@@ -148,7 +148,7 @@ func (s *memoryGraph[K, T]) AddVertex(value T, options ...func(*VertexProperties
 	return nil
 }
 
-func (s *memoryGraph[K, T]) UpdateVertex(hash K, options ...func(*Vertex[T])) error {
+func (s *memoryGraph[K, V, E]) UpdateVertex(hash K, options ...func(*Vertex[V])) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -166,7 +166,7 @@ func (s *memoryGraph[K, T]) UpdateVertex(hash K, options ...func(*Vertex[T])) er
 	return nil
 }
 
-func (s *memoryGraph[K, T]) RemoveVertex(hash K) error {
+func (s *memoryGraph[K, V, E]) RemoveVertex(hash K) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -186,8 +186,8 @@ func (s *memoryGraph[K, T]) RemoveVertex(hash K) error {
 	return nil
 }
 
-func (s *memoryGraph[K, T]) AddEdge(sourceHash, targetHash K, options ...func(*EdgeProperties)) error {
-	edge := &Edge[K]{
+func (s *memoryGraph[K, V, E]) AddEdge(sourceHash, targetHash K, options ...func(*EdgeProperties[E])) error {
+	edge := &Edge[K, E]{
 		Source: sourceHash,
 		Target: targetHash,
 	}
@@ -227,12 +227,12 @@ func (s *memoryGraph[K, T]) AddEdge(sourceHash, targetHash K, options ...func(*E
 	}
 
 	if _, ok := s.outEdges[sourceHash]; !ok {
-		s.outEdges[sourceHash] = make(map[K]*Edge[K])
+		s.outEdges[sourceHash] = make(map[K]*Edge[K, E])
 	}
 	s.outEdges[sourceHash][targetHash] = edge
 
 	if _, ok := s.inEdges[targetHash]; !ok {
-		s.inEdges[targetHash] = make(map[K]*Edge[K])
+		s.inEdges[targetHash] = make(map[K]*Edge[K, E])
 	}
 	s.inEdges[targetHash][sourceHash] = edge
 
@@ -241,7 +241,7 @@ func (s *memoryGraph[K, T]) AddEdge(sourceHash, targetHash K, options ...func(*E
 	return nil
 }
 
-func (s *memoryGraph[K, T]) UpdateEdge(source, target K, options ...func(properties *EdgeProperties)) error {
+func (s *memoryGraph[K, V, E]) UpdateEdge(source, target K, options ...func(properties *EdgeProperties[E])) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -255,7 +255,7 @@ func (s *memoryGraph[K, T]) UpdateEdge(source, target K, options ...func(propert
 	return nil
 }
 
-func (s *memoryGraph[K, T]) RemoveEdge(source, target K) error {
+func (s *memoryGraph[K, V, E]) RemoveEdge(source, target K) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -272,25 +272,25 @@ func (s *memoryGraph[K, T]) RemoveEdge(source, target K) error {
 	return nil
 }
 
-func (s *memoryGraph[K, T]) AdjacencyMap() (map[K]map[K]Edge[K], error) {
+func (s *memoryGraph[K, V, E]) AdjacencyMap() (map[K]map[K]Edge[K, E], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	adj := make(map[K]map[K]Edge[K])
+	adj := make(map[K]map[K]Edge[K, E])
 	for k := range s.vertices {
-		adj[k] = make(map[K]Edge[K])
+		adj[k] = make(map[K]Edge[K, E])
 	}
 	for src, out := range s.outEdges {
 		for tgt, e := range out {
 			// Note: make sure to use 'src' and 'tgt' since the edge fields may be
 			// in either order for undirected graphs
-			adj[src][tgt] = Edge[K]{
+			adj[src][tgt] = Edge[K, E]{
 				Source:     src,
 				Target:     tgt,
 				Properties: e.Properties,
 			}
 			if !s.traits.IsDirected {
-				adj[tgt][src] = Edge[K]{
+				adj[tgt][src] = Edge[K, E]{
 					Source:     tgt,
 					Target:     src,
 					Properties: e.Properties,
@@ -301,25 +301,25 @@ func (s *memoryGraph[K, T]) AdjacencyMap() (map[K]map[K]Edge[K], error) {
 	return adj, nil
 }
 
-func (s *memoryGraph[K, T]) PredecessorMap() (map[K]map[K]Edge[K], error) {
+func (s *memoryGraph[K, V, E]) PredecessorMap() (map[K]map[K]Edge[K, E], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	pred := make(map[K]map[K]Edge[K])
+	pred := make(map[K]map[K]Edge[K, E])
 	for k := range s.vertices {
-		pred[k] = make(map[K]Edge[K])
+		pred[k] = make(map[K]Edge[K, E])
 	}
 	for src, out := range s.outEdges {
 		for tgt, e := range out {
 			// Note: make sure to use 'src' and 'tgt' since the edge fields may be
 			// in either order for undirected graphs
-			pred[tgt][src] = Edge[K]{
+			pred[tgt][src] = Edge[K, E]{
 				Source:     src,
 				Target:     tgt,
 				Properties: e.Properties,
 			}
 			if !s.traits.IsDirected {
-				pred[src][tgt] = Edge[K]{
+				pred[src][tgt] = Edge[K, E]{
 					Source:     tgt,
 					Target:     src,
 					Properties: e.Properties,
@@ -335,7 +335,7 @@ func (s *memoryGraph[K, T]) PredecessorMap() (map[K]map[K]Edge[K], error) {
 //
 // Because CreatesCycle doesn't need to modify the PredecessorMap, we can use
 // inEdges instead to compute the same thing without creating any copies.
-func (s *memoryGraph[K, T]) CreatesCycle(source, target K) (bool, error) {
+func (s *memoryGraph[K, V, E]) CreatesCycle(source, target K) (bool, error) {
 	if source == target {
 		return true, nil
 	}
@@ -345,7 +345,7 @@ func (s *memoryGraph[K, T]) CreatesCycle(source, target K) (bool, error) {
 	return s.createsCycle(source, target)
 }
 
-func (s *memoryGraph[K, T]) createsCycle(source, target K) (bool, error) {
+func (s *memoryGraph[K, V, E]) createsCycle(source, target K) (bool, error) {
 	if source == target {
 		return true, nil
 	}
@@ -381,10 +381,10 @@ func (s *memoryGraph[K, T]) createsCycle(source, target K) (bool, error) {
 	return false, nil
 }
 
-func (s *memoryGraph[K, T]) DownstreamNeighbors(hash K) func(yield func(Edge[K], error) bool) {
+func (s *memoryGraph[K, V, E]) DownstreamNeighbors(hash K) func(yield func(Edge[K, E], error) bool) {
 	s.mu.RLock()
 
-	return func(yield func(Edge[K], error) bool) {
+	return func(yield func(Edge[K, E], error) bool) {
 		defer s.mu.RUnlock()
 
 		if v, ok := s.outEdges[hash]; ok {
@@ -406,10 +406,10 @@ func (s *memoryGraph[K, T]) DownstreamNeighbors(hash K) func(yield func(Edge[K],
 	}
 }
 
-func (s *memoryGraph[K, T]) UpstreamNeighbors(hash K) func(yield func(Edge[K], error) bool) {
+func (s *memoryGraph[K, V, E]) UpstreamNeighbors(hash K) func(yield func(Edge[K, E], error) bool) {
 	s.mu.RLock()
 
-	return func(yield func(Edge[K], error) bool) {
+	return func(yield func(Edge[K, E], error) bool) {
 		defer s.mu.RUnlock()
 
 		if v, ok := s.inEdges[hash]; ok {
@@ -431,20 +431,20 @@ func (s *memoryGraph[K, T]) UpstreamNeighbors(hash K) func(yield func(Edge[K], e
 	}
 }
 
-func (s *memoryGraph[K, T]) Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(Edge[K], Edge[K]) bool) error {
+func (s *memoryGraph[K, V, E]) Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(Edge[K, E], Edge[K, E]) bool) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var deps map[K]map[K]*Edge[K]
+	var deps map[K]map[K]*Edge[K, E]
 	switch dir {
 	case WalkDirectionDown:
 		deps = s.outEdges
 	case WalkDirectionUp:
 		deps = s.inEdges
 	}
-	var lessP func(*Edge[K], *Edge[K]) bool
+	var lessP func(*Edge[K, E], *Edge[K, E]) bool
 	if less != nil {
-		lessP = func(i, j *Edge[K]) bool {
+		lessP = func(i, j *Edge[K, E]) bool {
 			return less(*i, *j)
 		}
 	}

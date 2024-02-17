@@ -2,9 +2,9 @@ package graph
 
 // GraphRelations is used for graphs that can provide more efficient
 // implementations of the [AdjacencyMap] and [PredecessorMap] methods.
-type GraphRelations[K comparable] interface {
-	AdjacencyMap() (map[K]map[K]Edge[K], error)
-	PredecessorMap() (map[K]map[K]Edge[K], error)
+type GraphRelations[K comparable, E any] interface {
+	AdjacencyMap() (map[K]map[K]Edge[K, E], error)
+	PredecessorMap() (map[K]map[K]Edge[K, E], error)
 }
 
 // PredecessorMap computes a predecessor map with all vertices in the graph.
@@ -27,25 +27,25 @@ type GraphRelations[K comparable] interface {
 //
 // If the graph does not implement [GraphRelations], PredecessorMap will be
 // computed from the edges of the graph.
-func PredecessorMap[K comparable, T any](g GraphRead[K, T]) (map[K]map[K]Edge[K], error) {
+func PredecessorMap[K comparable, V any, E any](g GraphRead[K, V, E]) (map[K]map[K]Edge[K, E], error) {
 	if rel, ok := g.(interface {
-		PredecessorMap() (map[K]map[K]Edge[K], error)
+		PredecessorMap() (map[K]map[K]Edge[K, E], error)
 	}); ok {
 		return rel.PredecessorMap()
 	}
-	adj := make(map[K]map[K]Edge[K])
+	adj := make(map[K]map[K]Edge[K, E])
 	for v, err := range g.Vertices() {
 		if err != nil {
 			return nil, err
 		}
-		adj[g.Hash(v.Value)] = make(map[K]Edge[K])
+		adj[g.Hash(v.Value)] = make(map[K]Edge[K, E])
 	}
 	for e, err := range g.Edges() {
 		if err != nil {
 			return nil, err
 		}
 		if _, ok := adj[e.Target]; !ok {
-			adj[e.Target] = make(map[K]Edge[K])
+			adj[e.Target] = make(map[K]Edge[K, E])
 		}
 		adj[e.Target][e.Source] = e
 	}
@@ -73,25 +73,25 @@ func PredecessorMap[K comparable, T any](g GraphRead[K, T]) (map[K]map[K]Edge[K]
 //
 // If the graph does not implement [GraphRelations], AdjacencyMap will be
 // computed from the edges of the graph.
-func AdjacencyMap[K comparable, T any](g GraphRead[K, T]) (map[K]map[K]Edge[K], error) {
+func AdjacencyMap[K comparable, V any, E any](g GraphRead[K, V, E]) (map[K]map[K]Edge[K, E], error) {
 	if rel, ok := g.(interface {
-		AdjacencyMap() (map[K]map[K]Edge[K], error)
+		AdjacencyMap() (map[K]map[K]Edge[K, E], error)
 	}); ok {
 		return rel.AdjacencyMap()
 	}
-	adj := make(map[K]map[K]Edge[K])
+	adj := make(map[K]map[K]Edge[K, E])
 	for v, err := range g.Vertices() {
 		if err != nil {
 			return nil, err
 		}
-		adj[g.Hash(v.Value)] = make(map[K]Edge[K])
+		adj[g.Hash(v.Value)] = make(map[K]Edge[K, E])
 	}
 	for e, err := range g.Edges() {
 		if err != nil {
 			return nil, err
 		}
 		if _, ok := adj[e.Source]; !ok {
-			adj[e.Source] = make(map[K]Edge[K])
+			adj[e.Source] = make(map[K]Edge[K, E])
 		}
 		adj[e.Source][e.Target] = e
 	}

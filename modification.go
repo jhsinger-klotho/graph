@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func RemoveVertexAndEdges[K comparable, T any](g Graph[K, T], id K) error {
+func RemoveVertexAndEdges[K comparable, V any, E any](g Graph[K, V, E], id K) error {
 	for e, err := range g.Edges() {
 		if err != nil {
 			return err
@@ -21,7 +21,7 @@ func RemoveVertexAndEdges[K comparable, T any](g Graph[K, T], id K) error {
 	return g.RemoveVertex(id)
 }
 
-func ReplaceVertex[K comparable, T any](g Graph[K, T], oldId K, newValue T, hasher func(T) K) error {
+func ReplaceVertex[K comparable, V any, E any](g Graph[K, V, E], oldId K, newValue V, hasher func(V) K) error {
 	newKey := hasher(newValue)
 	if newKey == oldId {
 		return nil
@@ -54,7 +54,7 @@ func ReplaceVertex[K comparable, T any](g Graph[K, T], oldId K, newValue T, hash
 		}
 		err = errors.Join(
 			g.RemoveEdge(e.Source, e.Target),
-			g.AddEdge(newEdge.Source, newEdge.Target, func(ep *EdgeProperties) { *ep = e.Properties }),
+			g.AddEdge(EdgeCopy(newEdge)),
 		)
 		if err != nil {
 			return err

@@ -10,18 +10,18 @@ import (
 
 func TestGenerateDOT(t *testing.T) {
 	tests := map[string]struct {
-		graph            graph.Graph[string, string]
+		graph            graph.Graph[string, string, any]
 		attributes       map[string]string
 		vertices         []string
 		vertexProperties map[string]graph.VertexProperties
-		edges            []graph.Edge[string]
+		edges            []graph.Edge[string, any]
 		expected         Description
 	}{
 		"3-vertex directed graph": {
-			graph:      graph.NewMemoryGraph(graph.StringHash, graph.Directed()),
+			graph:      graph.NewMemoryGraph[string, string, any](graph.StringHash, graph.Directed()),
 			attributes: map[string]string{},
 			vertices:   []string{"1", "2", "3"},
-			edges: []graph.Edge[string]{
+			edges: []graph.Edge[string, any]{
 				{Source: "1", Target: "2"},
 				{Source: "1", Target: "3"},
 			},
@@ -39,14 +39,14 @@ func TestGenerateDOT(t *testing.T) {
 			},
 		},
 		"3-vertex directed, weighted graph with weights and attributes": {
-			graph:      graph.NewMemoryGraph(graph.StringHash, graph.Directed()),
+			graph:      graph.NewMemoryGraph[string, string, any](graph.StringHash, graph.Directed()),
 			attributes: map[string]string{},
 			vertices:   []string{"1", "2", "3"},
-			edges: []graph.Edge[string]{
+			edges: []graph.Edge[string, any]{
 				{
 					Source: "1",
 					Target: "2",
-					Properties: graph.EdgeProperties{
+					Properties: graph.EdgeProperties[any]{
 						Weight: 10,
 						Attributes: map[string]string{
 							"color": "red",
@@ -76,7 +76,7 @@ func TestGenerateDOT(t *testing.T) {
 			},
 		},
 		"vertices with attributes": {
-			graph:      graph.NewMemoryGraph(graph.StringHash, graph.Directed()),
+			graph:      graph.NewMemoryGraph[string, string, any](graph.StringHash, graph.Directed()),
 			attributes: map[string]string{},
 			vertices:   []string{"1", "2"},
 			vertexProperties: map[string]graph.VertexProperties{
@@ -93,7 +93,7 @@ func TestGenerateDOT(t *testing.T) {
 					Weight: 20,
 				},
 			},
-			edges: []graph.Edge[string]{
+			edges: []graph.Edge[string, any]{
 				{Source: "1", Target: "2"},
 			},
 			expected: Description{
@@ -123,14 +123,14 @@ func TestGenerateDOT(t *testing.T) {
 			},
 		},
 		"directed graph with attributes": {
-			graph: graph.NewMemoryGraph(graph.StringHash, graph.Directed()),
+			graph: graph.NewMemoryGraph[string, string, any](graph.StringHash, graph.Directed()),
 			attributes: map[string]string{
 				"label":     "my-graph",
 				"normalize": "true",
 				"compound":  "false",
 			},
 			vertices: []string{"1", "2"},
-			edges: []graph.Edge[string]{
+			edges: []graph.Edge[string, any]{
 				{Source: "1", Target: "2"},
 			},
 			expected: Description{
@@ -176,13 +176,13 @@ func TestGenerateDOT(t *testing.T) {
 		for _, edge := range test.edges {
 			var err error
 			if len(edge.Properties.Attributes) == 0 {
-				err = test.graph.AddEdge(edge.Source, edge.Target, graph.EdgeWeight(edge.Properties.Weight))
+				err = test.graph.AddEdge(edge.Source, edge.Target, graph.EdgeWeight[any](edge.Properties.Weight))
 			}
 			// If there are edge attributes, iterate over them and call
 			// EdgeAttribute for each entry. An edge should only have one
 			// attribute so that AddEdge is invoked once.
 			for key, value := range edge.Properties.Attributes {
-				err = test.graph.AddEdge(edge.Source, edge.Target, graph.EdgeWeight(edge.Properties.Weight), graph.EdgeAttribute(key, value))
+				err = test.graph.AddEdge(edge.Source, edge.Target, graph.EdgeWeight[any](edge.Properties.Weight), graph.EdgeAttribute[any](key, value))
 			}
 			if err != nil {
 				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
