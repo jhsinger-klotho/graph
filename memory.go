@@ -380,3 +380,73 @@ func (s *memoryGraph[K, T]) createsCycle(source, target K) (bool, error) {
 
 	return false, nil
 }
+
+func (s *memoryGraph[K, T]) DownstreamNeighbors(hash K) func(yield func(Edge[K], error) bool) {
+	s.mu.RLock()
+
+	return func(yield func(Edge[K], error) bool) {
+		defer s.mu.RUnlock()
+
+		if v, ok := s.outEdges[hash]; ok {
+			for _, e := range v {
+				if !yield(*e, nil) {
+					return
+				}
+			}
+		}
+		if !s.traits.IsDirected {
+			if v, ok := s.inEdges[hash]; ok {
+				for _, e := range v {
+					if !yield(*e, nil) {
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+func (s *memoryGraph[K, T]) UpstreamNeighbors(hash K) func(yield func(Edge[K], error) bool) {
+	s.mu.RLock()
+
+	return func(yield func(Edge[K], error) bool) {
+		defer s.mu.RUnlock()
+
+		if v, ok := s.inEdges[hash]; ok {
+			for _, e := range v {
+				if !yield(*e, nil) {
+					return
+				}
+			}
+		}
+		if !s.traits.IsDirected {
+			if v, ok := s.outEdges[hash]; ok {
+				for _, e := range v {
+					if !yield(*e, nil) {
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+func (s *memoryGraph[K, T]) Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(Edge[K], Edge[K]) bool) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var deps map[K]map[K]*Edge[K]
+	switch dir {
+	case WalkDirectionDown:
+		deps = s.outEdges
+	case WalkDirectionUp:
+		deps = s.inEdges
+	}
+	var lessP func(*Edge[K], *Edge[K]) bool
+	if less != nil {
+		lessP = func(i, j *Edge[K]) bool {
+			return less(*i, *j)
+		}
+	}
+	return walk(deps, order, start, f, lessP)
+}

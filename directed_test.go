@@ -782,54 +782,234 @@ func TestDirected_OrderAndSize(t *testing.T) {
 	}
 }
 
-func TestDirected_predecessors(t *testing.T) {
+func TestDirected_DownstreamNeighbors(t *testing.T) {
 	tests := map[string]struct {
-		vertices             []int
-		edges                []Edge[int]
-		vertex               int
-		expectedPredecessors []int
+		vertices []int
+		edges    []Edge[int]
+		start    int
+		expected []int
 	}{
-		"graph with 3 vertices": {
-			vertices: []int{1, 2, 3},
-			edges: []Edge[int]{
-				{Source: 1, Target: 2},
-				{Source: 1, Target: 3},
-			},
-			vertex:               2,
-			expectedPredecessors: []int{1},
+		"no neighbors": {
+			vertices: []int{1, 2, 3, 4},
+			edges:    []Edge[int]{},
+			start:    1,
+			expected: []int{},
 		},
-		"graph with 6 vertices": {
-			vertices: []int{1, 2, 3, 4, 5, 6},
-			edges: []Edge[int]{
-				{Source: 1, Target: 2},
-				{Source: 1, Target: 3},
-				{Source: 2, Target: 4},
-				{Source: 2, Target: 5},
-				{Source: 3, Target: 6},
-			},
-			vertex:               5,
-			expectedPredecessors: []int{2},
-		},
-		"graph with 4 vertices and 3 predecessors": {
+		"diamond-shaped graph": {
 			vertices: []int{1, 2, 3, 4},
 			edges: []Edge[int]{
-				{Source: 1, Target: 4},
+				{Source: 1, Target: 2},
+				{Source: 1, Target: 3},
 				{Source: 2, Target: 4},
 				{Source: 3, Target: 4},
 			},
-			vertex:               4,
-			expectedPredecessors: []int{1, 2, 3},
+			start:    1,
+			expected: []int{2, 3},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			g := newTestGraph(test.vertices, test.edges)
+
+			var neighbors []int
+			for n, err := range g.DownstreamNeighbors(test.start) {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				neighbors = append(neighbors, n.Target)
+			}
+
+			if !slicesAreEqual(neighbors, test.expected) {
+				t.Errorf("expected neighbors %v, got %v", test.expected, neighbors)
+			}
+		})
+	}
+}
+
+func TestDirected_UpstreamNeighbors(t *testing.T) {
+	tests := map[string]struct {
+		vertices []int
+		edges    []Edge[int]
+		start    int
+		expected []int
+	}{
+		"no neighbors": {
+			vertices: []int{1, 2, 3, 4},
+			edges:    []Edge[int]{},
+			start:    1,
+			expected: []int{},
+		},
+		"diamond-shaped graph": {
+			vertices: []int{1, 2, 3, 4},
+			edges: []Edge[int]{
+				{Source: 1, Target: 2},
+				{Source: 1, Target: 3},
+				{Source: 2, Target: 4},
+				{Source: 3, Target: 4},
+			},
+			start:    4,
+			expected: []int{2, 3},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			g := newTestGraph(test.vertices, test.edges)
+
+			var neighbors []int
+			for n, err := range g.UpstreamNeighbors(test.start) {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				neighbors = append(neighbors, n.Source)
+			}
+
+			if !slicesAreEqual(neighbors, test.expected) {
+				t.Errorf("expected neighbors %v, got %v", test.expected, neighbors)
+			}
+		})
+	}
+}
+
+func TestDirected_Walk(t *testing.T) {
+	tests := map[string]struct {
+		vertices  []int
+		edges     []Edge[int]
+		direction WalkDirection
+		start     int
+		walkErr   map[int]error
+		expectBFS []Path[int]
+		expectDFS []Path[int]
+	}{
+		"no connections": {
+			vertices: []int{1, 2, 3, 4},
+			edges:    []Edge[int]{},
+			start:    1,
+		},
+		"diamond-shaped graph/down": {
+			vertices: []int{1, 2, 3, 4},
+			edges: []Edge[int]{
+				{Source: 1, Target: 2, Properties: EdgeProperties{Weight: 1}},
+				{Source: 1, Target: 3, Properties: EdgeProperties{Weight: 2}},
+				{Source: 2, Target: 4},
+				{Source: 3, Target: 4},
+			},
+			start:     1,
+			direction: WalkDirectionDown,
+			expectBFS: []Path[int]{
+				{1, 2},
+				{1, 3},
+				{1, 2, 4},
+				{1, 3, 4},
+			},
+			expectDFS: []Path[int]{
+				{1, 2},
+				{1, 2, 4},
+				{1, 3},
+				{1, 3, 4},
+			},
+		},
+		"diamond-shaped graph/up": {
+			vertices: []int{1, 2, 3, 4},
+			edges: []Edge[int]{
+				{Source: 1, Target: 2},
+				{Source: 1, Target: 3},
+				{Source: 2, Target: 4, Properties: EdgeProperties{Weight: 1}},
+				{Source: 3, Target: 4, Properties: EdgeProperties{Weight: 2}},
+			},
+			start:     4,
+			direction: WalkDirectionUp,
+			expectBFS: []Path[int]{
+				{4, 2},
+				{4, 3},
+				{4, 2, 1},
+				{4, 3, 1},
+			},
+			expectDFS: []Path[int]{
+				{4, 2},
+				{4, 2, 1},
+				{4, 3},
+				{4, 3, 1},
+			},
+		},
+		"skip path": {
+			vertices: []int{1, 2, 3, 4},
+			edges: []Edge[int]{
+				{Source: 1, Target: 2},
+				{Source: 2, Target: 3, Properties: EdgeProperties{Weight: 1}},
+				{Source: 2, Target: 4, Properties: EdgeProperties{Weight: 2}},
+				{Source: 3, Target: 4},
+			},
+			start:     1,
+			direction: WalkDirectionDown,
+			walkErr: map[int]error{
+				3: SkipPath,
+			},
+			expectBFS: []Path[int]{
+				{1, 2},
+				{1, 2, 3},
+				{1, 2, 4},
+			},
+			expectDFS: []Path[int]{
+				{1, 2},
+				{1, 2, 3},
+				{1, 2, 4},
+			},
+		},
+		"skip all": {
+			vertices: []int{1, 2, 3, 4},
+			edges: []Edge[int]{
+				{Source: 1, Target: 2},
+				{Source: 2, Target: 3, Properties: EdgeProperties{Weight: 1}},
+				{Source: 2, Target: 4, Properties: EdgeProperties{Weight: 2}},
+				{Source: 3, Target: 4},
+			},
+			start:     1,
+			direction: WalkDirectionDown,
+			walkErr: map[int]error{
+				3: SkipAll,
+			},
+			expectBFS: []Path[int]{
+				{1, 2},
+				{1, 2, 3},
+			},
+			expectDFS: []Path[int]{
+				{1, 2},
+				{1, 2, 3},
+			},
 		},
 	}
 
 	for name, test := range tests {
-		graph := newTestGraph(test.vertices, test.edges)
+		t.Run(name, func(t *testing.T) {
+			g := newTestGraph(test.vertices, test.edges)
 
-		predecessors, _ := predecessors[int](graph, graph.hash(test.vertex))
+			for order, expectedAll := range map[WalkOrder][]Path[int]{WalkOrderBFS: test.expectBFS, WalkOrderDFS: test.expectDFS} {
+				t.Run(order.String(), func(t *testing.T) {
+					var walk []Path[int]
+					_ = g.Walk(test.direction, order, test.start, func(p Path[int], nerr error) error {
+						// make a copy because the slice is reused
+						pcpy := make(Path[int], len(p))
+						copy(pcpy, p)
+						walk = append(walk, pcpy)
+						if test.walkErr != nil {
+							return test.walkErr[pcpy[len(pcpy)-1]]
+						}
+						return nil
+					}, EdgeWeightLess)
 
-		if !slicesAreEqual(predecessors, test.expectedPredecessors) {
-			t.Errorf("%s: predecessors don't match: expected %v, got %v", name, test.expectedPredecessors, predecessors)
-		}
+					if len(expectedAll) != len(walk) {
+						t.Errorf("[%s] expected walk length %d, got %d", order, len(expectedAll), len(walk))
+					}
+
+					for i, p := range walk {
+						expected := expectedAll[i]
+						if !slicesAreEqual(p, expected) {
+							t.Errorf("[%s/%d] expected walk %v, got %v", order, i, expected, p)
+						}
+					}
+				})
+			}
+		})
 	}
 }
 
@@ -846,27 +1026,6 @@ func slicesAreEqual[T comparable](a, b []T) bool {
 			}
 		}
 		if !found {
-			return false
-		}
-	}
-
-	return true
-}
-
-func vertexPropertiesAreEqual(a, b VertexProperties) bool {
-	if a.Weight != b.Weight {
-		return false
-	}
-
-	// A length check is required because in the iteration below, a.Attributes
-	// could be empty and thus circumvent the comparison.
-	if len(a.Attributes) != len(b.Attributes) {
-		return false
-	}
-
-	for key, aValue := range a.Attributes {
-		bValue, ok := b.Attributes[key]
-		if !ok || aValue != bValue {
 			return false
 		}
 	}
@@ -915,21 +1074,6 @@ func edgesAreEqual[K comparable](a, b Edge[K], directed bool) bool {
 	}
 
 	return true
-}
-
-func predecessors[K comparable](g GraphRelations[K], vertexHash K) ([]K, error) {
-	var predecessorHashes []K
-
-	predecessorMap, err := g.PredecessorMap()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, edge := range predecessorMap[vertexHash] {
-		predecessorHashes = append(predecessorHashes, edge.Source)
-	}
-
-	return predecessorHashes, nil
 }
 
 func newTestGraph(vertices []int, edges []Edge[int]) *memoryGraph[int, int] {
