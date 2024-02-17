@@ -645,7 +645,7 @@ func TestDirectedStronglyConnectedComponents(t *testing.T) {
 	tests := map[string]struct {
 		vertices     []int
 		edges        []Edge[int, any]
-		expectedSCCs [][]int
+		expectedSCCs []Path[int]
 	}{
 		"graph with SCCs as on img/scc.svg": {
 			vertices: []int{1, 2, 3, 4, 5, 6, 7, 8},
@@ -665,7 +665,7 @@ func TestDirectedStronglyConnectedComponents(t *testing.T) {
 				{Source: 8, Target: 4},
 				{Source: 8, Target: 7},
 			},
-			expectedSCCs: [][]int{{1, 2, 5}, {3, 4, 8}, {6, 7}},
+			expectedSCCs: []Path[int]{{1, 2, 5}, {3, 4, 8}, {6, 7}},
 		},
 	}
 
@@ -697,13 +697,12 @@ func TestAllPathsBetween(t *testing.T) {
 		start int
 		end   int
 	}
-	type testCase[K comparable, T any] struct {
+	tests := []struct {
 		name    string
 		args    args
-		want    [][]K
+		want    []Path[int]
 		wantErr bool
-	}
-	tests := []testCase[int, int]{
+	}{
 		{
 			name: "directed",
 			args: args{
@@ -728,7 +727,7 @@ func TestAllPathsBetween(t *testing.T) {
 				start: 3,
 				end:   6,
 			},
-			want: [][]int{
+			want: []Path[int]{
 				{3, 1, 0, 2, 6},
 				{3, 1, 4, 5, 6},
 				{3, 1, 4, 5, 2, 6},
@@ -761,7 +760,7 @@ func TestAllPathsBetween(t *testing.T) {
 				start: 3,
 				end:   6,
 			},
-			want: [][]int{
+			want: []Path[int]{
 				{3, 1, 0, 2, 6},
 				{3, 1, 0, 2, 5, 6},
 				{3, 1, 4, 5, 6},
@@ -791,7 +790,7 @@ func TestAllPathsBetween(t *testing.T) {
 				start: 0,
 				end:   0,
 			},
-			want: [][]int{
+			want: []Path[int]{
 				{0, 1, 2, 3, 0},
 				{0, 1, 2, 0},
 			},
@@ -816,7 +815,7 @@ func TestAllPathsBetween(t *testing.T) {
 				start: 0,
 				end:   0,
 			},
-			want: [][]int{
+			want: []Path[int]{
 				{0, 1, 2, 3, 0},
 				{0, 1, 2, 0},
 				{0, 0},
@@ -842,7 +841,7 @@ func TestAllPathsBetween(t *testing.T) {
 				start: 0,
 				end:   2,
 			},
-			want: [][]int{
+			want: []Path[int]{
 				{0, 1, 2},
 				{0, 2},
 			},
@@ -851,7 +850,15 @@ func TestAllPathsBetween(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := AllPathsBetween(tt.args.g, tt.args.start, tt.args.end)
+			var got []Path[int]
+			var err error
+			for p, perr := range AllPathsBetween(tt.args.g, tt.args.start, tt.args.end) {
+				got = append(got, p)
+				err = perr
+				if perr != nil {
+					break
+				}
+			}
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AllPathsBetween() error = %v, wantErr %v", err, tt.wantErr)
 				return

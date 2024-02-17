@@ -380,7 +380,7 @@ func findSCC[K comparable, E any](vertexHash K, state *sccState[K, E]) {
 }
 
 type GraphAllPaths[K comparable] interface {
-	AllPathsBetween(start, end K) ([]Path[K], error)
+	AllPathsBetween(start, end K) func(yield func(Path[K], error) bool)
 }
 
 // AllPathsBetween computes and returns all paths between two given vertices. A
@@ -389,10 +389,16 @@ type GraphAllPaths[K comparable] interface {
 //
 // AllPathsBetween utilizes a non-recursive, stack-based implementation. It has
 // an estimated runtime complexity of O(n^2) where n is the number of vertices.
-func AllPathsBetween[K comparable, V any, E any](g GraphRead[K, V, E], start, end K) ([][]K, error) {
+func AllPathsBetween[K comparable, V any, E any](g GraphRead[K, V, E], start, end K) func(yield func(Path[K], error) bool) {
+	if pather, ok := g.(GraphAllPaths[K]); ok {
+		return pather.AllPathsBetween(start, end)
+	}
+
 	adjacencyMap, err := AdjacencyMap[K, V](g)
 	if err != nil {
-		return nil, err
+		return func(yield func(Path[K], error) bool) {
+			yield(nil, fmt.Errorf("could not get adjacency map: %w", err))
+		}
 	}
 
 	// Use a pool to save on allocations
@@ -474,31 +480,35 @@ func AllPathsBetween[K comparable, V any, E any](g GraphRead[K, V, E], start, en
 
 	buildLayer(start)
 
-	allPaths := make([][]K, 0)
+	return func(yield func(Path[K], error) bool) {
+		for !mainStack.isEmpty() {
+			v, _ := mainStack.top()
+			adjs, _ := viceStack.top()
 
-	for !mainStack.isEmpty() {
-		v, _ := mainStack.top()
-		adjs, _ := viceStack.top()
+			if adjs.isEmpty() {
+				if v == end && len(mainStack.elements) > 1 {
+					path := make([]K, 0)
+					mainStack.forEach(func(k K) {
+						path = append(path, k)
+					})
+					if !yield(path, nil) {
+						return
+					}
+				}
 
-		if adjs.isEmpty() {
-			if v == end && len(mainStack.elements) > 1 {
-				path := make([]K, 0)
-				mainStack.forEach(func(k K) {
-					path = append(path, k)
-				})
-				allPaths = append(allPaths, path)
-			}
-
-			err = removeLayer()
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			if err = buildStack(); err != nil {
-				return nil, err
+				err = removeLayer()
+				if err != nil {
+					if !yield(nil, err) {
+						return
+					}
+				}
+			} else {
+				if err = buildStack(); err != nil {
+					if !yield(nil, err) {
+						return
+					}
+				}
 			}
 		}
 	}
-
-	return allPaths, nil
 }
