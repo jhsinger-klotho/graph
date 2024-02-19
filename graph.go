@@ -244,6 +244,20 @@ func EdgeT[K comparable, T any, E any](g GraphRead[K, T, E], source, target K) (
 	}, nil
 }
 
+func EdgesWithVertex[K comparable, V any, E any](g GraphRead[K, V, E]) func(yield func(Edge[V, E], error) bool) {
+	return func(yield func(Edge[V, E], error) bool) {
+		for e, err := range g.Edges() {
+			var ev Edge[V, E]
+			if err == nil {
+				ev, err = EdgeT(g, e.Source, e.Target)
+			}
+			if !yield(ev, err) {
+				return
+			}
+		}
+	}
+}
+
 func KeysToString[K comparable, V any, E any](g GraphRead[K, V, E]) (string, error) {
 	adj, err := AdjacencyMap(g)
 	if err != nil {

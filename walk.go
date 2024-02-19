@@ -30,8 +30,8 @@ var (
 	WalkDirectionDown WalkDirection = false
 	WalkDirectionUp   WalkDirection = true
 
-	WalkOrderBFS WalkOrder = false
-	WalkOrderDFS WalkOrder = true
+	WalkOrderBFS WalkOrder = true
+	WalkOrderDFS WalkOrder = false
 )
 
 // WalkPaths walks through the graph starting at `start`. The `Path` given will be in the order traversed, not the
