@@ -61,9 +61,8 @@ func (s *memoryGraph[K, V, E]) Vertex(hash K) (V, VertexProperties, error) {
 }
 
 func (s *memoryGraph[K, V, E]) Vertices() func(yield func(Vertex[V], error) bool) {
-	s.mu.RLock()
-
 	return func(yield func(Vertex[V], error) bool) {
+		s.mu.RLock()
 		defer s.mu.RUnlock()
 
 		for _, v := range s.vertices {
@@ -105,8 +104,8 @@ func (s *memoryGraph[K, V, E]) Edge(sourceHash, targetHash K) (Edge[K, E], error
 }
 
 func (s *memoryGraph[K, V, E]) Edges() func(yield func(Edge[K, E], error) bool) {
-	s.mu.RLock()
 	return func(yield func(Edge[K, E], error) bool) {
+		s.mu.RLock()
 		defer s.mu.RUnlock()
 
 		for _, out := range s.outEdges {
@@ -474,9 +473,8 @@ func (s *memoryGraph[K, V, E]) createsCycle(source, target K) (bool, error) {
 }
 
 func (s *memoryGraph[K, V, E]) DownstreamNeighbors(hash K) func(yield func(Edge[K, E], error) bool) {
-	s.mu.RLock()
-
 	return func(yield func(Edge[K, E], error) bool) {
+		s.mu.RLock()
 		defer s.mu.RUnlock()
 
 		if v, ok := s.outEdges[hash]; ok {
@@ -499,9 +497,8 @@ func (s *memoryGraph[K, V, E]) DownstreamNeighbors(hash K) func(yield func(Edge[
 }
 
 func (s *memoryGraph[K, V, E]) UpstreamNeighbors(hash K) func(yield func(Edge[K, E], error) bool) {
-	s.mu.RLock()
-
 	return func(yield func(Edge[K, E], error) bool) {
+		s.mu.RLock()
 		defer s.mu.RUnlock()
 
 		if v, ok := s.inEdges[hash]; ok {
