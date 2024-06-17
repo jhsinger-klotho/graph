@@ -2,9 +2,9 @@ package graph
 
 type GraphNeighbors[K comparable, E any] interface {
 	// DownstreamNeighbors returns all edges that have the given vertex as their source. A default implementation built on top of [AdjacencyMap] is provided: [DownstreamNeighbors].
-	DownstreamNeighbors(K) func(yield func(Edge[K, E], error) bool)
+	DownstreamNeighbors(K) EdgeIter[K, E]
 	// UpstreamNeighbors returns all edges that have the given vertex as their target. A default implementation built on top of [PredecessorMap] is provided: [UpstreamNeighbors].
-	UpstreamNeighbors(K) func(yield func(Edge[K, E], error) bool)
+	UpstreamNeighbors(K) EdgeIter[K, E]
 }
 
 // DownstreamNeighbors returns an iterator over the downstream neighbors of the given vertex.
@@ -12,7 +12,7 @@ type GraphNeighbors[K comparable, E any] interface {
 func DownstreamNeighbors[K comparable, V any, E any](g interface {
 	GraphRead[K, V, E]
 	GraphRelations[K, E]
-}, hash K) func(yield func(Edge[K, E], error) bool) {
+}, hash K) EdgeIter[K, E] {
 	return func(yield func(Edge[K, E], error) bool) {
 		adj, err := g.AdjacencyMap()
 		if err != nil {
@@ -29,7 +29,7 @@ func DownstreamNeighbors[K comparable, V any, E any](g interface {
 	}
 }
 
-func (d DefaultGraph[K, V, E]) DownstreamNeighbors(hash K) func(yield func(Edge[K, E], error) bool) {
+func (d DefaultGraph[K, V, E]) DownstreamNeighbors(hash K) EdgeIter[K, E] {
 	return DownstreamNeighbors[K, V, E](d, hash)
 }
 
@@ -38,7 +38,7 @@ func (d DefaultGraph[K, V, E]) DownstreamNeighbors(hash K) func(yield func(Edge[
 func UpstreamNeighbors[K comparable, V any, E any](g interface {
 	GraphRead[K, V, E]
 	GraphRelations[K, E]
-}, hash K) func(yield func(Edge[K, E], error) bool) {
+}, hash K) EdgeIter[K, E] {
 	return func(yield func(Edge[K, E], error) bool) {
 		pred, err := g.PredecessorMap()
 		if err != nil {
@@ -55,6 +55,6 @@ func UpstreamNeighbors[K comparable, V any, E any](g interface {
 	}
 }
 
-func (d DefaultGraph[K, V, E]) UpstreamNeighbors(hash K) func(yield func(Edge[K, E], error) bool) {
+func (d DefaultGraph[K, V, E]) UpstreamNeighbors(hash K) EdgeIter[K, E] {
 	return UpstreamNeighbors[K, V, E](d, hash)
 }

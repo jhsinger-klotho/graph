@@ -454,7 +454,7 @@ func (s *memoryGraph[K, V, E]) createsCycle(source, target K) (bool, error) {
 	return false, nil
 }
 
-func (s *memoryGraph[K, V, E]) DownstreamNeighbors(hash K) func(yield func(Edge[K, E], error) bool) {
+func (s *memoryGraph[K, V, E]) DownstreamNeighbors(hash K) EdgeIter[K, E] {
 	return func(yield func(Edge[K, E], error) bool) {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
@@ -478,7 +478,7 @@ func (s *memoryGraph[K, V, E]) DownstreamNeighbors(hash K) func(yield func(Edge[
 	}
 }
 
-func (s *memoryGraph[K, V, E]) UpstreamNeighbors(hash K) func(yield func(Edge[K, E], error) bool) {
+func (s *memoryGraph[K, V, E]) UpstreamNeighbors(hash K) EdgeIter[K, E] {
 	return func(yield func(Edge[K, E], error) bool) {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
