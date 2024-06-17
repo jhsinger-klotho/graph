@@ -19,13 +19,6 @@ type (
 
 var (
 	_ Graph[string, string, string] = (*memoryGraph[string, string, string])(nil)
-
-	// Make sure the memory graph provides more performant implementations for the following traits
-	_ GraphRelations[string, string]            = (*memoryGraph[string, string, string])(nil)
-	_ GraphCycles[string]                       = (*memoryGraph[string, string, string])(nil)
-	_ GraphNeighbors[string, string]            = (*memoryGraph[string, string, string])(nil)
-	_ GraphWalker[string, string]               = (*memoryGraph[string, string, string])(nil)
-	_ GraphBulkInserter[string, string, string] = (*memoryGraph[string, string, string])(nil)
 )
 
 func NewMemoryGraph[K comparable, V any, E any](hash Hash[K, V], options ...func(*Traits)) *memoryGraph[K, V, E] {
@@ -49,18 +42,17 @@ func (s *memoryGraph[K, V, E]) Hash(v V) K {
 	return s.hash(v)
 }
 
-func (s *memoryGraph[K, V, E]) Vertex(hash K) (V, VertexProperties, error) {
+func (s *memoryGraph[K, V, E]) Vertex(hash K) (Vertex[V], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	v := s.vertices[hash]
 	if v == nil {
-		var zero V
-		return zero, VertexProperties{}, &VertexNotFoundError[K]{Key: hash}
+		return Vertex[V]{}, &VertexNotFoundError[K]{Key: hash}
 	}
-	return v.Value, v.Properties, nil
+	return *v, nil
 }
 
-func (s *memoryGraph[K, V, E]) Vertices() func(yield func(Vertex[V], error) bool) {
+func (s *memoryGraph[K, V, E]) Vertices() VertexIter[V] {
 	return func(yield func(Vertex[V], error) bool) {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
@@ -103,7 +95,7 @@ func (s *memoryGraph[K, V, E]) Edge(sourceHash, targetHash K) (Edge[K, E], error
 	return edge, nil
 }
 
-func (s *memoryGraph[K, V, E]) Edges() func(yield func(Edge[K, E], error) bool) {
+func (s *memoryGraph[K, V, E]) Edges() EdgeIter[K, E] {
 	return func(yield func(Edge[K, E], error) bool) {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
@@ -153,29 +145,23 @@ func (s *memoryGraph[K, V, E]) AddVertex(value V, options ...func(*VertexPropert
 	return nil
 }
 
-func (s *memoryGraph[K, V, E]) AddVertices(values []V, options ...func(*VertexProperties)) error {
+func (s *memoryGraph[K, V, E]) AddVertices(values []Vertex[V]) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Use a two-step process to maintain atomicity
+	vs := make(map[K]*Vertex[V], len(values))
 	for _, value := range values {
-		k := s.hash(value)
+		k := s.hash(value.Value)
 		if existing, ok := s.vertices[k]; ok {
 			return &VertexAlreadyExistsError[K, V]{Key: k, ExistingVertex: *existing}
 		}
+		vs[k] = &Vertex[V]{Value: value.Value}
 	}
-	for _, value := range values {
-		k := s.hash(value)
-		v := &Vertex[V]{Value: value}
-		for _, option := range options {
-			option(&v.Properties)
-		}
-
-		if !s.traits.IsVerticesWeighted && v.Properties.Weight != 0 {
-			s.traits.IsVerticesWeighted = true
-		}
-
-		s.vertices[k] = v
+	for k, value := range vs {
+		v := Vertex[V]{Value: value.Value}
+		VertexCopyProperties(value.Properties)(&v.Properties)
+		s.vertices[k] = &v
 	}
 
 	return nil
@@ -208,7 +194,9 @@ func (s *memoryGraph[K, V, E]) RemoveVertex(hash K) error {
 	}
 	count := 0
 	count += len(s.outEdges[hash])
-	count += len(s.inEdges[hash])
+	if s.traits.IsDirected {
+		count += len(s.inEdges[hash])
+	}
 	if count > 0 {
 		return &VertexHasEdgesError[K]{Key: hash, Count: count}
 	}
@@ -274,60 +262,56 @@ func (s *memoryGraph[K, V, E]) AddEdge(sourceHash, targetHash K, options ...func
 	return nil
 }
 
-func (s *memoryGraph[K, V, E]) AddEdges(edges map[K][]K, options ...func(*EdgeProperties[E])) error {
+func (s *memoryGraph[K, V, E]) AddEdges(edges []Edge[K, E]) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Use a two-step process to maintain atomicity
-	for source, targets := range edges {
-		for _, target := range targets {
-			_, ok := s.vertices[source]
-			if !ok {
-				return &VertexNotFoundError[K]{Key: source}
-			}
-			_, ok = s.vertices[target]
-			if !ok {
-				return &VertexNotFoundError[K]{Key: target}
-			}
+	for _, e := range edges {
+		source, target := e.Source, e.Target
+		_, ok := s.vertices[source]
+		if !ok {
+			return &VertexNotFoundError[K]{Key: source}
+		}
+		_, ok = s.vertices[target]
+		if !ok {
+			return &VertexNotFoundError[K]{Key: target}
+		}
 
-			if e := s.edge(source, target); e != nil {
-				return &EdgeAlreadyExistsError[K, E]{ExistingEdge: *e}
-			}
+		if e := s.edge(source, target); e != nil {
+			return &EdgeAlreadyExistsError[K, E]{ExistingEdge: *e}
+		}
 
-			if s.traits.PreventCycles {
-				// important: use the lowercase method since we're already holding the lock
-				cycle, err := s.createsCycle(source, target)
-				if err != nil {
-					return err
-				}
-				if cycle {
-					return &EdgeCausesCycleError[K]{Source: source, Target: target}
-				}
+		if s.traits.PreventCycles {
+			// important: use the lowercase method since we're already holding the lock
+			cycle, err := s.createsCycle(source, target)
+			if err != nil {
+				return err
+			}
+			if cycle {
+				return &EdgeCausesCycleError[K]{Source: source, Target: target}
 			}
 		}
 	}
-	for source, targets := range edges {
-		for _, target := range targets {
-			edge := &Edge[K, E]{
-				Source: source,
-				Target: target,
-			}
-			for _, option := range options {
-				option(&edge.Properties)
-			}
-
-			if _, ok := s.outEdges[source]; !ok {
-				s.outEdges[source] = make(map[K]*Edge[K, E])
-			}
-			s.outEdges[source][target] = edge
-
-			if _, ok := s.inEdges[target]; !ok {
-				s.inEdges[target] = make(map[K]*Edge[K, E])
-			}
-			s.inEdges[target][source] = edge
-
-			s.edgeCount++
+	for _, e := range edges {
+		source, target := e.Source, e.Target
+		edge := &Edge[K, E]{
+			Source: source,
+			Target: target,
 		}
+		EdgeCopyProperties(e.Properties)(&edge.Properties)
+
+		if _, ok := s.outEdges[source]; !ok {
+			s.outEdges[source] = make(map[K]*Edge[K, E])
+		}
+		s.outEdges[source][target] = edge
+
+		if _, ok := s.inEdges[target]; !ok {
+			s.inEdges[target] = make(map[K]*Edge[K, E])
+		}
+		s.inEdges[target][source] = edge
+
+		s.edgeCount++
 	}
 	return nil
 }

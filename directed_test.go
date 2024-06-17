@@ -62,7 +62,7 @@ func TestDirected_AddVertex(t *testing.T) {
 			}
 
 			hash := graph.hash(vertex)
-			vertex, props, err := graph.Vertex(hash)
+			vertex, err := graph.Vertex(hash)
 			if err != nil {
 				vertices := graph.vertices
 				t.Errorf("%s: vertex %v not found in graph: %v", name, vertex, vertices)
@@ -71,6 +71,7 @@ func TestDirected_AddVertex(t *testing.T) {
 			if test.properties == nil {
 				continue
 			}
+			props := vertex.Properties
 
 			if props.Weight != test.expectedProperties.Weight {
 				t.Errorf("%s: edge weights don't match: expected weight %v, got %v", name, test.expectedProperties.Weight, props.Weight)
@@ -113,7 +114,7 @@ func TestDirected_Vertex(t *testing.T) {
 	for name, test := range tests {
 		graph := newTestGraph(test.vertices, nil)
 
-		vertex, _, err := graph.Vertex(test.vertex)
+		vertex, err := graph.Vertex(test.vertex)
 
 		if !errors.Is(err, test.expectedError) {
 			t.Errorf("%s: error expectancy doesn't match: expected %v, got %v", name, test.expectedError, err)
@@ -123,7 +124,7 @@ func TestDirected_Vertex(t *testing.T) {
 			continue
 		}
 
-		if vertex != test.vertex {
+		if vertex.Value != test.vertex {
 			t.Errorf("%s: vertex expectancy doesn't match: expected %v, got %v", name, test.vertex, vertex)
 		}
 	}

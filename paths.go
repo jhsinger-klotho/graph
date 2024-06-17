@@ -29,11 +29,11 @@ func PathWeight[K comparable, V any, E any](g GraphRead[K, V, E], path Path[K]) 
 			weight += 1
 		}
 		if verticesWeighted {
-			_, props, err := g.Vertex(path[i])
+			v, err := g.Vertex(path[i])
 			if err != nil {
 				return 0, fmt.Errorf("vertex(path[%d]): %w", i, err)
 			}
-			weight += props.Weight
+			weight += v.Properties.Weight
 		}
 	}
 	return
@@ -108,11 +108,18 @@ func CreatesCycle[K comparable, V any, E any](g interface {
 	return false, nil
 }
 
+func (d DefaultGraph[K, V, E]) CreatesCycle(source, target K) (bool, error) {
+	return CreatesCycle(d, source, target)
+}
+
 type GraphShortestPath[K comparable, V any, E any] interface {
 	// ShortestPath returns a function which computes the shortest path between the given source
-	// and arbitrary target vertices. A default implementation is provided: [ShortestPath] as well as algorithm
-	// specific implementations in [DijkstraShortestPath] and [BellmanFordShortestPath].
-	ShortestPaths(source K) (ShortestPather[K], error)
+	// and arbitrary target vertices. A default implementation is provided: [ShortestPath]/[ShortestPathStable]
+	// as well as algorithm specific implementations in [DijkstraShortestPath] and [BellmanFordShortestPath].
+	// Note: Intermediate data is expected to be computed on the construction of the pathing function, not
+	// on Any errors encountered during the computation of the shortest path will be returned when the
+	// function is called.
+	ShortestPaths(source K, less func(a, b K) bool) ShortestPather[K]
 }
 
 // ShortestPather is a function that computes the shortest path to a target vertex.
@@ -128,18 +135,22 @@ type ShortestPather[K comparable] func(target K) (Path[K], error)
 func ShortestPath[K comparable, V any, E any](g interface {
 	GraphRead[K, V, E]
 	GraphRelations[K, E]
-}, source, target K) (Path[K], error) {
+}, source K) ShortestPather[K] {
 	if g.Traits().IsDirected {
-		return BellmanFordShortestPath(g, source, nil)(target)
+		return BellmanFordShortestPath(g, source, nil)
 	}
-	return DijkstraShortestPath(g, source)(target)
+	return DijkstraShortestPath(g, source)
 }
 
 func ShortestPathStable[K comparable, V any, E any](g interface {
 	GraphRead[K, V, E]
 	GraphRelations[K, E]
-}, source, target K, less func(a, b K) bool) (Path[K], error) {
-	return BellmanFordShortestPath(g, source, less)(target)
+}, source K, less func(a, b K) bool) ShortestPather[K] {
+	return BellmanFordShortestPath(g, source, less)
+}
+
+func (d DefaultGraph[K, V, E]) ShortestPaths(source K, less func(a, b K) bool) ShortestPather[K] {
+	return ShortestPathStable(d, source, less)
 }
 
 type shortestPathResult[K comparable] struct {
@@ -216,11 +227,11 @@ func DijkstraShortestPath[K comparable, V any, E any](g interface {
 			weight += weights[vertex]
 
 			if verticesWeighted {
-				_, props, err := g.Vertex(adjacency)
+				v, err := g.Vertex(adjacency)
 				if err != nil {
 					return errShortestPath[K]{err: fmt.Errorf("could not get vertex to determine weight: %w", err)}.ShortestPath
 				}
-				weight += props.Weight
+				weight += v.Properties.Weight
 			}
 
 			if weight < weights[adjacency] && !hasInfiniteWeight {
@@ -277,11 +288,11 @@ func BellmanFordShortestPath[K comparable, V any, E any](g interface {
 					weight = 1
 				}
 				if verticesWeighted {
-					_, props, err := g.Vertex(adj)
+					v, err := g.Vertex(adj)
 					if err != nil {
 						return errShortestPath[K]{err: fmt.Errorf("could not get vertex to determine weight: %w", err)}.ShortestPath
 					}
-					weight += props.Weight
+					weight += v.Properties.Weight
 				}
 				if newDist := dist[key] + weight; newDist < dist[edge.Target] {
 					dist[edge.Target] = newDist
@@ -298,11 +309,11 @@ func BellmanFordShortestPath[K comparable, V any, E any](g interface {
 				weight = 1
 			}
 			if verticesWeighted {
-				_, props, err := g.Vertex(adj)
+				v, err := g.Vertex(adj)
 				if err != nil {
 					return errShortestPath[K]{err: fmt.Errorf("could not get vertex to determine weight: %w", err)}.ShortestPath
 				}
-				weight += props.Weight
+				weight += v.Properties.Weight
 			}
 			if newDist := dist[edge.Source] + weight; newDist < dist[edge.Target] {
 				return errShortestPath[K]{err: errors.New("graph contains a negative-weight cycle")}.ShortestPath

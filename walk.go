@@ -67,6 +67,10 @@ func WalkPathsStable[K comparable, V any, E any](g interface {
 	return walk(deps, order, start, f, less)
 }
 
+func (d DefaultGraph[K, V, E]) Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(a, b Edge[K, E]) bool) error {
+	return WalkPathsStable(d, dir, order, start, f, less)
+}
+
 func EdgeWeightLess[K comparable, E any](e1, e2 Edge[K, E]) bool {
 	return e1.Properties.Weight < e2.Properties.Weight
 }

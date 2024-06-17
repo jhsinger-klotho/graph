@@ -40,12 +40,12 @@ func ReplaceVertex[K comparable, V any, E any](g interface {
 		return g.UpdateVertex(oldId, func(v *Vertex[V]) { v.Value = newValue })
 	}
 
-	_, props, err := g.Vertex(oldId)
+	v, err := g.Vertex(oldId)
 	if err != nil {
 		return err
 	}
 
-	err = g.AddVertex(newValue, VertexCopyProperties(props))
+	err = g.AddVertex(newValue, VertexCopyProperties(v.Properties))
 	if err != nil {
 		return fmt.Errorf("could not add new vertex %v: %w", newKey, err)
 	}

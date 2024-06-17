@@ -58,20 +58,20 @@ import (
 // type T identified by a hash of type K.
 type (
 	Graph[K comparable, V any, E any] interface {
-		GraphReadOnly[K, V, E]
+		// Read interfaces
+		GraphRead[K, V, E]
+		GraphRelations[K, E]
+		GraphNeighbors[K, E]
+		GraphCycles[K]
+		GraphWalker[K, E]
 
 		// Write interfaces
 		GraphWrite[K, V, E]
 		GraphBulkInserter[K, V, E]
 	}
 
-	GraphReadOnly[K comparable, V any, E any] interface {
-		GraphRead[K, V, E]
-		GraphRelations[K, E]
-		GraphNeighbors[K, E]
-		GraphCycles[K]
-		GraphWalker[K, E]
-	}
+	VertexIter[V any]             func(yield func(Vertex[V], error) bool)
+	EdgeIter[K comparable, E any] func(yield func(Edge[K, E], error) bool)
 
 	GraphRead[K comparable, V any, E any] interface {
 		Hash(V) K
@@ -79,10 +79,10 @@ type (
 
 		// Vertex returns the vertex with the given hash or ErrVertexNotFound if it
 		// doesn't exist.
-		Vertex(hash K) (V, VertexProperties, error)
+		Vertex(hash K) (Vertex[V], error)
 
 		// Vertices returns a slice of all vertices in the graph.
-		Vertices() func(yield func(Vertex[V], error) bool)
+		Vertices() VertexIter[V]
 
 		// Edge returns the edge joining two given vertices or ErrEdgeNotFound if
 		// the edge doesn't exist. In an undirected graph, an edge with swapped
@@ -90,8 +90,9 @@ type (
 		Edge(sourceHash, targetHash K) (Edge[K, E], error)
 
 		// Edges returns a slice of all edges in the graph. These edges are of type
-		// Edge[K] and hence will contain the vertex hashes, not the vertex values.
-		Edges() func(yield func(Edge[K, E], error) bool)
+		// Edge[K] and hence will contain the vertex hashes, not the vertex values
+		// for performance.
+		Edges() EdgeIter[K, E]
 
 		// Order returns the number of vertices in the graph.
 		Order() (int, error)
@@ -208,25 +209,27 @@ type VertexProperties struct {
 	Weight     float64
 }
 
-func CopyTo[K comparable, T any, E any](from GraphRead[K, T, E], to GraphWrite[K, T, E]) error {
+func CopyTo[K comparable, V any, E any](from GraphRead[K, V, E], to GraphBulkInserter[K, V, E]) error {
+	var vertices []Vertex[V]
 	for v, err := range from.Vertices() {
 		if err != nil {
 			return err
 		}
-		err := to.AddVertex(VertexCopy(v))
-		if err != nil {
-			return err
-		}
+		vertices = append(vertices, v)
+	}
+	if err := to.AddVertices(vertices); err != nil {
+		return err
 	}
 
+	var edges []Edge[K, E]
 	for e, err := range from.Edges() {
 		if err != nil {
 			return err
 		}
-		err := to.AddEdge(EdgeCopy(e))
-		if err != nil {
-			return err
-		}
+		edges = append(edges, e)
+	}
+	if err := to.AddEdges(edges); err != nil {
+		return err
 	}
 
 	return nil
@@ -240,17 +243,17 @@ func EdgeT[K comparable, T any, E any](g GraphRead[K, T, E], source, target K) (
 	if err != nil {
 		return edge, err
 	}
-	sourceV, _, err := g.Vertex(source)
+	sourceV, err := g.Vertex(source)
 	if err != nil {
 		return edge, fmt.Errorf("failed to get source vertex: %w", err)
 	}
-	targetV, _, err := g.Vertex(target)
+	targetV, err := g.Vertex(target)
 	if err != nil {
 		return edge, fmt.Errorf("failed to get target vertex: %w", err)
 	}
 	return Edge[T, E]{
-		Source:     sourceV,
-		Target:     targetV,
+		Source:     sourceV.Value,
+		Target:     targetV.Value,
 		Properties: e.Properties,
 	}, nil
 }

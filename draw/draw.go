@@ -70,7 +70,7 @@ func DOT[K comparable, V any, E any](g interface {
 	graph.GraphRead[K, V, E]
 	graph.GraphRelations[K, E]
 }, w io.Writer, options ...func(*Description)) error {
-	desc, err := generateDOT(g, options...)
+	desc, err := generateDOT[K, V, E](g, options...)
 	if err != nil {
 		return fmt.Errorf("failed to generate DOT description: %w", err)
 	}
@@ -110,15 +110,15 @@ func generateDOT[K comparable, V any, E any](g interface {
 	}
 
 	for sourceK, adjacencies := range adjacencyMap {
-		_, props, err := g.Vertex(sourceK)
+		v, err := g.Vertex(sourceK)
 		if err != nil {
 			return desc, err
 		}
 
 		stmt := Statement{
 			Source:           sourceK,
-			SourceWeight:     props.Weight,
-			SourceAttributes: props.Attributes,
+			SourceWeight:     v.Properties.Weight,
+			SourceAttributes: v.Properties.Attributes,
 		}
 		desc.Statements = append(desc.Statements, stmt)
 

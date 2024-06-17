@@ -41,18 +41,18 @@ func spanningTree[K comparable, V any, E any](g interface {
 	edges := make([]Edge[K, E], 0)
 	subtrees := newUnionFind[K]()
 
-	for v, adjacencies := range adjacencyMap {
-		value, props, err := g.Vertex(v)
+	for k, adjacencies := range adjacencyMap {
+		v, err := g.Vertex(k)
 		if err != nil {
-			return fmt.Errorf("failed to get vertex %v: %w", v, err)
+			return fmt.Errorf("failed to get vertex %v: %w", k, err)
 		}
 
-		err = mst.AddVertex(value, VertexCopyProperties(props))
+		err = mst.AddVertex(VertexCopy(v))
 		if err != nil {
-			return fmt.Errorf("failed to add vertex %v: %w", v, err)
+			return fmt.Errorf("failed to add vertex %v: %w", k, err)
 		}
 
-		subtrees.add(v)
+		subtrees.add(k)
 
 		for _, edge := range adjacencies {
 			edges = append(edges, edge)
