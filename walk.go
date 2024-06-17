@@ -2,6 +2,7 @@ package graph
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"sort"
 )
@@ -25,7 +26,9 @@ type (
 )
 
 var (
-	SkipAll  = errors.New("skip all")
+	// SkipAll is a special error that can be returned from a WalkGraphFunc to stop the walk entirely.
+	SkipAll = errors.New("skip all")
+	// SkipPath is a special error that can be returned from a WalkGraphFunc to skip the current path and all branches from it.
 	SkipPath = errors.New("skip path")
 
 	WalkDirectionDown WalkDirection = "down"
@@ -56,15 +59,18 @@ func WalkPathsStable[K comparable, V any, E any](g interface {
 }, dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(a, b Edge[K, E]) bool) error {
 	var deps map[K]map[K]Edge[K, E]
 	var err error
-	if dir == WalkDirectionDown {
+	switch dir {
+	case WalkDirectionDown:
 		deps, err = g.AdjacencyMap()
-	} else {
+	case WalkDirectionUp:
 		deps, err = g.PredecessorMap()
+	default:
+		return fmt.Errorf("unknown walk direction: %v", dir)
 	}
 	if err != nil {
 		return err
 	}
-	return walk(deps, order, start, f, less)
+	return WalkDeps(deps, order, start, f, less)
 }
 
 func (d DefaultGraph[K, V, E]) Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(a, b Edge[K, E]) bool) error {
@@ -75,8 +81,10 @@ func EdgeWeightLess[K comparable, E any](e1, e2 Edge[K, E]) bool {
 	return e1.Properties.Weight < e2.Properties.Weight
 }
 
-// ET is either `Edge[K, E]` (when used with [AdjacencyMap] or [PredecessorMap]) or `*Edge[K, E]` (used internally for memoryGraph implementation)
-func walk[K comparable, ET any](
+// WalkDeps is the bulk of the implementation of the walking.
+// Deps is either an adjacency map or a predecessor map, depending on the direction.
+// [ET] is either `Edge[K, E]` (when used with [AdjacencyMap] or [PredecessorMap]) or `*Edge[K, E]` (used for eg. memoryGraph implementation)
+func WalkDeps[K comparable, ET any](
 	deps map[K]map[K]ET,
 	order WalkOrder,
 	start K,
@@ -173,6 +181,7 @@ func walk[K comparable, ET any](
 			return nil
 		}
 		if nerr == SkipPath {
+			// continue skips the adding of subsequent neighbors, thereby ending the current path
 			continue
 		}
 		err = nerr

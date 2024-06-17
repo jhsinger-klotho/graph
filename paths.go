@@ -418,10 +418,14 @@ func findSCC[K comparable, E any](vertexHash K, state *sccState[K, E]) {
 	}
 }
 
-type GraphAllPaths[K comparable] interface {
-	// AllPathsBetween returns all the paths between two given vertices. A default implementation is provided: [AllPathsBetween].
-	AllPathsBetween(start, end K) func(yield func(Path[K], error) bool)
-}
+type (
+	PathIter[K comparable] func(yield func(Path[K], error) bool)
+
+	GraphAllPaths[K comparable] interface {
+		// AllPathsBetween returns all the paths between two given vertices. A default implementation is provided: [AllPathsBetween].
+		AllPathsBetween(start, end K) PathIter[K]
+	}
+)
 
 // AllPathsBetween computes and returns all paths between two given vertices. A
 // path is represented as a slice of vertex hashes. The returned slice contains
@@ -429,18 +433,18 @@ type GraphAllPaths[K comparable] interface {
 //
 // AllPathsBetween utilizes a non-recursive, stack-based implementation. It has
 // an estimated runtime complexity of O(n^2) where n is the number of vertices.
-func AllPathsBetween[K comparable, V any, E any](g interface {
-	GraphRead[K, V, E]
-	GraphRelations[K, E]
-}, start, end K) func(yield func(Path[K], error) bool) {
-
+func AllPathsBetween[K comparable, E any](g GraphRelations[K, E], start, end K) PathIter[K] {
 	adjacencyMap, err := g.AdjacencyMap()
 	if err != nil {
 		return func(yield func(Path[K], error) bool) {
 			yield(nil, fmt.Errorf("could not get adjacency map: %w", err))
 		}
 	}
+	return AllPathsFromAdjacency(adjacencyMap, start, end)
+}
 
+// [ET] is either `Edge[K, E]` (when used with [AllPathsBetween]) or `*Edge[K, E]` (used for eg. memoryGraph implementation)
+func AllPathsFromAdjacency[K comparable, ET any](adjacencyMap map[K]map[K]ET, start, end K) PathIter[K] {
 	// Use a pool to save on allocations
 	var oldStacks []*stack[K]
 	newStack := func() *stack[K] {
@@ -487,7 +491,7 @@ func AllPathsBetween[K comparable, V any, E any](g interface {
 	}
 
 	buildStack := func() error {
-		if err = checkEmpty(); err != nil {
+		if err := checkEmpty(); err != nil {
 			return fmt.Errorf("unable to build stack: %w", err)
 		}
 
@@ -503,7 +507,7 @@ func AllPathsBetween[K comparable, V any, E any](g interface {
 	}
 
 	removeLayer := func() error {
-		if err = checkEmpty(); err != nil {
+		if err := checkEmpty(); err != nil {
 			return fmt.Errorf("unable to remove layer: %w", err)
 		}
 
@@ -536,14 +540,14 @@ func AllPathsBetween[K comparable, V any, E any](g interface {
 					}
 				}
 
-				err = removeLayer()
+				err := removeLayer()
 				if err != nil {
 					if !yield(nil, err) {
 						return
 					}
 				}
 			} else {
-				if err = buildStack(); err != nil {
+				if err := buildStack(); err != nil {
 					if !yield(nil, err) {
 						return
 					}
@@ -551,4 +555,8 @@ func AllPathsBetween[K comparable, V any, E any](g interface {
 			}
 		}
 	}
+}
+
+func (d DefaultGraph[K, V, E]) AllPathsBetween(start, end K) PathIter[K] {
+	return AllPathsBetween(d, start, end)
 }

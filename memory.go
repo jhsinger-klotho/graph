@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -13,7 +14,7 @@ type (
 		vertices  map[K]*Vertex[V]
 		outEdges  map[K]map[K]*Edge[K, E] // source -> target
 		inEdges   map[K]map[K]*Edge[K, E] // target -> source
-		edgeCount int
+		edgeCount int                     // keep a separate edge count for O(1) access
 	}
 )
 
@@ -89,10 +90,7 @@ func (s *memoryGraph[K, V, E]) Edge(sourceHash, targetHash K) (Edge[K, E], error
 	if e == nil {
 		return Edge[K, E]{}, &EdgeNotFoundError[K]{Source: sourceHash, Target: targetHash}
 	}
-	edge := *e
-	edge.Source = sourceHash
-	edge.Target = targetHash
-	return edge, nil
+	return *e, nil
 }
 
 func (s *memoryGraph[K, V, E]) Edges() EdgeIter[K, E] {
@@ -351,9 +349,9 @@ func (s *memoryGraph[K, V, E]) AdjacencyMap() (map[K]map[K]Edge[K, E], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	adj := make(map[K]map[K]Edge[K, E])
+	adj := make(map[K]map[K]Edge[K, E], len(s.vertices))
 	for k := range s.vertices {
-		adj[k] = make(map[K]Edge[K, E])
+		adj[k] = make(map[K]Edge[K, E], len(s.outEdges[k]))
 	}
 	for src, out := range s.outEdges {
 		for tgt, e := range out {
@@ -380,9 +378,9 @@ func (s *memoryGraph[K, V, E]) PredecessorMap() (map[K]map[K]Edge[K, E], error) 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	pred := make(map[K]map[K]Edge[K, E])
+	pred := make(map[K]map[K]Edge[K, E], len(s.vertices))
 	for k := range s.vertices {
-		pred[k] = make(map[K]Edge[K, E])
+		pred[k] = make(map[K]Edge[K, E], len(s.inEdges[k]))
 	}
 	for src, out := range s.outEdges {
 		for tgt, e := range out {
@@ -514,6 +512,8 @@ func (s *memoryGraph[K, V, E]) Walk(dir WalkDirection, order WalkOrder, start K,
 		deps = s.outEdges
 	case WalkDirectionUp:
 		deps = s.inEdges
+	default:
+		return fmt.Errorf("unknown walk direction: %v", dir)
 	}
 	var lessP func(*Edge[K, E], *Edge[K, E]) bool
 	if less != nil {
@@ -521,5 +521,15 @@ func (s *memoryGraph[K, V, E]) Walk(dir WalkDirection, order WalkOrder, start K,
 			return less(*i, *j)
 		}
 	}
-	return walk(deps, order, start, f, lessP)
+	return WalkDeps(deps, order, start, f, lessP)
+}
+
+func (s *memoryGraph[K, V, E]) AllPathsBetween(start, end K) PathIter[K] {
+	return func(yield func(Path[K], error) bool) {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+
+		iter := AllPathsFromAdjacency(s.outEdges, start, end)
+		iter(yield)
+	}
 }

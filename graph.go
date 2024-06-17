@@ -64,6 +64,7 @@ type (
 		GraphNeighbors[K, E]
 		GraphCycles[K]
 		GraphWalker[K, E]
+		GraphAllPaths[K]
 
 		// Write interfaces
 		GraphWrite[K, V, E]
