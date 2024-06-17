@@ -90,7 +90,10 @@ func (s *memoryGraph[K, V, E]) Edge(sourceHash, targetHash K) (Edge[K, E], error
 	if e == nil {
 		return Edge[K, E]{}, &EdgeNotFoundError[K]{Source: sourceHash, Target: targetHash}
 	}
-	return *e, nil
+	edge := *e
+	edge.Source = sourceHash
+	edge.Target = targetHash
+	return edge, nil
 }
 
 func (s *memoryGraph[K, V, E]) Edges() EdgeIter[K, E] {
