@@ -58,8 +58,19 @@ import (
 // type T identified by a hash of type K.
 type (
 	Graph[K comparable, V any, E any] interface {
-		GraphRead[K, V, E]
+		GraphReadOnly[K, V, E]
+
+		// Write interfaces
 		GraphWrite[K, V, E]
+		GraphBulkInserter[K, V, E]
+	}
+
+	GraphReadOnly[K comparable, V any, E any] interface {
+		GraphRead[K, V, E]
+		GraphRelations[K, E]
+		GraphNeighbors[K, E]
+		GraphCycles[K]
+		GraphWalker[K, E]
 	}
 
 	GraphRead[K comparable, V any, E any] interface {
@@ -258,8 +269,11 @@ func EdgesWithVertex[K comparable, V any, E any](g GraphRead[K, V, E]) func(yiel
 	}
 }
 
-func KeysToString[K comparable, V any, E any](g GraphRead[K, V, E]) (string, error) {
-	adj, err := AdjacencyMap(g)
+func KeysToString[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphRelations[K, E]
+}) (string, error) {
+	adj, err := g.AdjacencyMap()
 	if err != nil {
 		return "", err
 	}

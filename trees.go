@@ -10,7 +10,10 @@ import (
 //
 // The MST contains all vertices from the given graph as well as the required
 // edges for building the MST. The original graph remains unchanged.
-func MinimumSpanningTree[K comparable, V any, E any](g Graph[K, V, E], mst Graph[K, V, E]) error {
+func MinimumSpanningTree[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphRelations[K, E]
+}, mst GraphWrite[K, V, E]) error {
 	return spanningTree(g, false, mst)
 }
 
@@ -19,12 +22,18 @@ func MinimumSpanningTree[K comparable, V any, E any](g Graph[K, V, E], mst Graph
 //
 // The MST contains all vertices from the given graph as well as the required
 // edges for building the MST. The original graph remains unchanged.
-func MaximumSpanningTree[K comparable, V any, E any](g Graph[K, V, E], mst Graph[K, V, E]) error {
+func MaximumSpanningTree[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphRelations[K, E]
+}, mst GraphWrite[K, V, E]) error {
 	return spanningTree(g, true, mst)
 }
 
-func spanningTree[K comparable, V any, E any](g Graph[K, V, E], maximum bool, mst Graph[K, V, E]) error {
-	adjacencyMap, err := AdjacencyMap[K, V](g)
+func spanningTree[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphRelations[K, E]
+}, maximum bool, mst GraphWrite[K, V, E]) error {
+	adjacencyMap, err := g.AdjacencyMap()
 	if err != nil {
 		return fmt.Errorf("failed to get adjacency map: %w", err)
 	}

@@ -5,8 +5,11 @@ import (
 	"fmt"
 )
 
-func RemoveVertexAndEdges[K comparable, V any, E any](g Graph[K, V, E], toRemove K) error {
-	for e, err := range DownstreamNeighbors(g, toRemove) {
+func RemoveVertexAndEdges[K comparable, V any, E any](g interface {
+	GraphWrite[K, V, E]
+	GraphNeighbors[K, E]
+}, toRemove K) error {
+	for e, err := range g.DownstreamNeighbors(toRemove) {
 		if err != nil {
 			return err
 		}
@@ -15,7 +18,7 @@ func RemoveVertexAndEdges[K comparable, V any, E any](g Graph[K, V, E], toRemove
 			return err
 		}
 	}
-	for e, err := range UpstreamNeighbors(g, toRemove) {
+	for e, err := range g.UpstreamNeighbors(toRemove) {
 		if err != nil {
 			return err
 		}
@@ -27,7 +30,11 @@ func RemoveVertexAndEdges[K comparable, V any, E any](g Graph[K, V, E], toRemove
 	return g.RemoveVertex(toRemove)
 }
 
-func ReplaceVertex[K comparable, V any, E any](g Graph[K, V, E], oldId K, newValue V) error {
+func ReplaceVertex[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphWrite[K, V, E]
+	GraphNeighbors[K, E]
+}, oldId K, newValue V) error {
 	newKey := g.Hash(newValue)
 	if newKey == oldId {
 		return g.UpdateVertex(oldId, func(v *Vertex[V]) { v.Value = newValue })
@@ -43,7 +50,7 @@ func ReplaceVertex[K comparable, V any, E any](g Graph[K, V, E], oldId K, newVal
 		return fmt.Errorf("could not add new vertex %v: %w", newKey, err)
 	}
 
-	for e, err := range DownstreamNeighbors(g, oldId) {
+	for e, err := range g.DownstreamNeighbors(oldId) {
 		if err != nil {
 			return err
 		}
@@ -56,7 +63,7 @@ func ReplaceVertex[K comparable, V any, E any](g Graph[K, V, E], oldId K, newVal
 			return err
 		}
 	}
-	for e, err := range UpstreamNeighbors(g, oldId) {
+	for e, err := range g.UpstreamNeighbors(oldId) {
 		if err != nil {
 			return err
 		}

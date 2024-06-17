@@ -16,22 +16,23 @@ type (
 	WalkGraphFunc[K comparable] func(p Path[K], nerr error) error
 
 	GraphWalker[K comparable, E any] interface {
+		// WalkPaths walks through the graph starting at `start`.
 		Walk(dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(a, b Edge[K, E]) bool) error
 	}
 
-	WalkDirection bool
-	WalkOrder     bool
+	WalkDirection string
+	WalkOrder     string
 )
 
 var (
 	SkipAll  = errors.New("skip all")
 	SkipPath = errors.New("skip path")
 
-	WalkDirectionDown WalkDirection = false
-	WalkDirectionUp   WalkDirection = true
+	WalkDirectionDown WalkDirection = "down"
+	WalkDirectionUp   WalkDirection = "up"
 
-	WalkOrderBFS WalkOrder = true
-	WalkOrderDFS WalkOrder = false
+	WalkOrderBFS WalkOrder = "bfs"
+	WalkOrderDFS WalkOrder = "dfs"
 )
 
 // WalkPaths walks through the graph starting at `start`. The `Path` given will be in the order traversed, not the
@@ -40,22 +41,25 @@ var (
 // If a loop is encountered, it is skipped.
 // Note: the `Path` argument to the callback function is reused on subsequent calls,
 // so do not store it directly anywhere, instead make a copy if you need to keep it.
-func WalkPaths[K comparable, V any, E any](g GraphRead[K, V, E], dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K]) error {
+func WalkPaths[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphRelations[K, E]
+}, dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K]) error {
 	return WalkPathsStable(g, dir, order, start, f, nil)
 }
 
 // WalkPathsStable is like [WalkPaths] but will sort the neighbors of each vertex before adding them, to ensure
 // a stable order of traversal.
-func WalkPathsStable[K comparable, V any, E any](g GraphRead[K, V, E], dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(a, b Edge[K, E]) bool) error {
-	if walker, ok := g.(GraphWalker[K, E]); ok {
-		return walker.Walk(dir, order, start, f, less)
-	}
+func WalkPathsStable[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphRelations[K, E]
+}, dir WalkDirection, order WalkOrder, start K, f WalkGraphFunc[K], less func(a, b Edge[K, E]) bool) error {
 	var deps map[K]map[K]Edge[K, E]
 	var err error
 	if dir == WalkDirectionDown {
-		deps, err = AdjacencyMap(g)
+		deps, err = g.AdjacencyMap()
 	} else {
-		deps, err = PredecessorMap(g)
+		deps, err = g.PredecessorMap()
 	}
 	if err != nil {
 		return err

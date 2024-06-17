@@ -66,7 +66,10 @@ type Statement struct {
 // add global attributes when rendering the graph:
 //
 //	_ = draw.DOT(g, file, draw.GraphAttribute("label", "my-graph"))
-func DOT[K comparable, V any, E any](g graph.GraphRead[K, V, E], w io.Writer, options ...func(*Description)) error {
+func DOT[K comparable, V any, E any](g interface {
+	graph.GraphRead[K, V, E]
+	graph.GraphRelations[K, E]
+}, w io.Writer, options ...func(*Description)) error {
 	desc, err := generateDOT(g, options...)
 	if err != nil {
 		return fmt.Errorf("failed to generate DOT description: %w", err)
@@ -82,7 +85,10 @@ func GraphAttribute(key, value string) func(*Description) {
 	}
 }
 
-func generateDOT[K comparable, V any, E any](g graph.GraphRead[K, V, E], options ...func(*Description)) (Description, error) {
+func generateDOT[K comparable, V any, E any](g interface {
+	graph.GraphRead[K, V, E]
+	graph.GraphRelations[K, E]
+}, options ...func(*Description)) (Description, error) {
 	desc := Description{
 		GraphType:    "graph",
 		Attributes:   make(map[string]string),
@@ -98,7 +104,7 @@ func generateDOT[K comparable, V any, E any](g graph.GraphRead[K, V, E], options
 		option(&desc)
 	}
 
-	adjacencyMap, err := graph.AdjacencyMap(g)
+	adjacencyMap, err := g.AdjacencyMap()
 	if err != nil {
 		return desc, err
 	}

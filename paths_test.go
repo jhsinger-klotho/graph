@@ -7,10 +7,6 @@ import (
 )
 
 func TestDirectedCreatesCycle(t *testing.T) {
-	// A wrapper type to passthrough read operations, but not other methods (to skip the interface check for custom impl)
-	type RO struct {
-		GraphRead[int, int, any]
-	}
 	tests := map[string]struct {
 		vertices     []int
 		edges        []Edge[int, any]
@@ -65,9 +61,9 @@ func TestDirectedCreatesCycle(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			graph := RO{GraphRead: newTestGraph(test.vertices, test.edges)}
+			graph := newTestGraph(test.vertices, test.edges)
 
-			createsCycle, err := CreatesCycle[int, int](graph, test.sourceHash, test.targetHash)
+			createsCycle, err := CreatesCycle(graph, test.sourceHash, test.targetHash)
 			if err != nil {
 				t.Fatalf("%s: failed to add edge: %s", name, err.Error())
 			}
@@ -622,7 +618,7 @@ func Test_BellmanFord(t *testing.T) {
 				}
 			}
 
-			shortestPath, err := BellmanFordShortestPath[string, string](graph, test.sourceHash, nil).ShortestPath(test.targetHash)
+			shortestPath, err := BellmanFordShortestPath[string, string](graph, test.sourceHash, nil)(test.targetHash)
 
 			if test.shouldFail != (err != nil) {
 				t.Fatalf("%s: error expectancy doesn't match: expected %v, got %v (error: %v)", name, test.shouldFail, (err != nil), err)

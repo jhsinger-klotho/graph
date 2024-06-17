@@ -138,8 +138,12 @@ invertedCheck:
 // must be a directed acyclic graph.
 //
 // TransitiveReduction is a very expensive operation scaling with O(V(V+E)).
-func TransitiveReduction[K comparable, V any, E any](g Graph[K, V, E]) error {
-	adjacencyMap, err := AdjacencyMap(g)
+func TransitiveReduction[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphWrite[K, V, E]
+	GraphRelations[K, E]
+}) error {
+	adjacencyMap, err := g.AdjacencyMap()
 	if err != nil {
 		return fmt.Errorf("failed to get adajcency map: %w", err)
 	}

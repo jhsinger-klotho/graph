@@ -4,10 +4,6 @@ import (
 	"fmt"
 )
 
-type DFSer[K comparable] interface {
-	DFS(K) func(func(K, error) bool)
-}
-
 // DFS performs a depth-first search on the graph, starting from the given vertex. The visit
 // function will be invoked with the hash of the vertex currently visited. If it returns false, DFS
 // will continue traversing the graph, and if it returns true, the traversal will be stopped. In
@@ -38,12 +34,12 @@ type DFSer[K comparable] interface {
 //	}
 //
 // DFS is non-recursive and maintains a stack instead.
-func DFS[K comparable, V any, E any](g Graph[K, V, E], start K) func(yield func(K, error) bool) {
-	if dfser, ok := g.(DFSer[K]); ok {
-		return dfser.DFS(start)
-	}
+func DFS[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphRelations[K, E]
+}, start K) func(yield func(K, error) bool) {
 
-	adjacencyMap, err := AdjacencyMap[K, V](g)
+	adjacencyMap, err := g.AdjacencyMap()
 	if err != nil {
 		return func(yield func(K, error) bool) {
 			var zeroKey K
@@ -82,10 +78,6 @@ func DFS[K comparable, V any, E any](g Graph[K, V, E], start K) func(yield func(
 	}
 }
 
-type BFSer[K comparable] interface {
-	BFS(K) func(func(K, error) bool)
-}
-
 // BFS performs a breadth-first search on the graph, starting from the given vertex. The visit
 // function will be invoked with the hash of the vertex currently visited. If it returns false, BFS
 // will continue traversing the graph, and if it returns true, the traversal will be stopped. In
@@ -116,12 +108,11 @@ type BFSer[K comparable] interface {
 //	}
 //
 // BFS is non-recursive and maintains a stack instead.
-func BFS[K comparable, V any, E any](g Graph[K, V, E], start K) func(yield func(K, error) bool) {
-	if bfser, ok := g.(BFSer[K]); ok {
-		return bfser.BFS(start)
-	}
-
-	adjacencyMap, err := AdjacencyMap[K, V](g)
+func BFS[K comparable, V any, E any](g interface {
+	GraphRead[K, V, E]
+	GraphRelations[K, E]
+}, start K) func(yield func(K, error) bool) {
+	adjacencyMap, err := g.AdjacencyMap()
 	if err != nil {
 		return func(yield func(K, error) bool) {
 			var zeroKey K

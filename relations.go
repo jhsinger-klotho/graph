@@ -1,38 +1,51 @@
 package graph
 
-// GraphRelations is used for graphs that can provide more efficient
-// implementations of the [AdjacencyMap] and [PredecessorMap] methods.
 type GraphRelations[K comparable, E any] interface {
+
+	// AdjacencyMap computes an adjacency map with all vertices in the graph.
+	//
+	// There is an entry for each vertex. Each of those entries is another map
+	// whose keys are the hash values of the adjacent vertices. The value is an
+	// Edge instance that stores the source and target hash values along with
+	// the edge metadata.
+	//
+	// For a directed graph with two edges AB and AC, AdjacencyMap would return
+	// the following map:
+	//
+	//	map[string]map[string]Edge[string]{
+	//		"A": map[string]Edge[string]{
+	//			"B": {Source: "A", Target: "B"},
+	//			"C": {Source: "A", Target: "C"},
+	//		},
+	//		"B": map[string]Edge[string]{},
+	//		"C": map[string]Edge[string]{},
+	//	}
+	//
+	// A default implementation is provided: [AdjacencyMap].
 	AdjacencyMap() (map[K]map[K]Edge[K, E], error)
+	// PredecessorMap computes a predecessor map with all vertices in the graph.
+	//
+	// It has the same map layout and does the same thing as AdjacencyMap, but
+	// for ingoing instead of outgoing edges of each vertex.
+	//
+	// For a directed graph with two edges AB and AC, PredecessorMap would
+	// return the following map:
+	//
+	//	map[string]map[string]Edge[string]{
+	//		"A": map[string]Edge[string]{},
+	//		"B": map[string]Edge[string]{
+	//			"A": {Source: "A", Target: "B"},
+	//		},
+	//		"C": map[string]Edge[string]{
+	//			"A": {Source: "A", Target: "C"},
+	//		},
+	//	}
+	//
+	// A default implementation is provided: [PredecessorMap].
 	PredecessorMap() (map[K]map[K]Edge[K, E], error)
 }
 
-// PredecessorMap computes a predecessor map with all vertices in the graph.
-//
-// It has the same map layout and does the same thing as AdjacencyMap, but
-// for ingoing instead of outgoing edges of each vertex.
-//
-// For a directed graph with two edges AB and AC, PredecessorMap would
-// return the following map:
-//
-//	map[string]map[string]Edge[string]{
-//		"A": map[string]Edge[string]{},
-//		"B": map[string]Edge[string]{
-//			"A": {Source: "A", Target: "B"},
-//		},
-//		"C": map[string]Edge[string]{
-//			"A": {Source: "A", Target: "C"},
-//		},
-//	}
-//
-// If the graph does not implement [GraphRelations], PredecessorMap will be
-// computed from the edges of the graph.
 func PredecessorMap[K comparable, V any, E any](g GraphRead[K, V, E]) (map[K]map[K]Edge[K, E], error) {
-	if rel, ok := g.(interface {
-		PredecessorMap() (map[K]map[K]Edge[K, E], error)
-	}); ok {
-		return rel.PredecessorMap()
-	}
 	adj := make(map[K]map[K]Edge[K, E])
 	for v, err := range g.Vertices() {
 		if err != nil {
@@ -52,33 +65,7 @@ func PredecessorMap[K comparable, V any, E any](g GraphRead[K, V, E]) (map[K]map
 	return adj, nil
 }
 
-// AdjacencyMap computes an adjacency map with all vertices in the graph.
-//
-// There is an entry for each vertex. Each of those entries is another map
-// whose keys are the hash values of the adjacent vertices. The value is an
-// Edge instance that stores the source and target hash values along with
-// the edge metadata.
-//
-// For a directed graph with two edges AB and AC, AdjacencyMap would return
-// the following map:
-//
-//	map[string]map[string]Edge[string]{
-//		"A": map[string]Edge[string]{
-//			"B": {Source: "A", Target: "B"},
-//			"C": {Source: "A", Target: "C"},
-//		},
-//		"B": map[string]Edge[string]{},
-//		"C": map[string]Edge[string]{},
-//	}
-//
-// If the graph does not implement [GraphRelations], AdjacencyMap will be
-// computed from the edges of the graph.
 func AdjacencyMap[K comparable, V any, E any](g GraphRead[K, V, E]) (map[K]map[K]Edge[K, E], error) {
-	if rel, ok := g.(interface {
-		AdjacencyMap() (map[K]map[K]Edge[K, E], error)
-	}); ok {
-		return rel.AdjacencyMap()
-	}
 	adj := make(map[K]map[K]Edge[K, E])
 	for v, err := range g.Vertices() {
 		if err != nil {
