@@ -688,8 +688,10 @@ func TestDirectedStronglyConnectedComponents(t *testing.T) {
 }
 
 func TestAllPathsBetween(t *testing.T) {
+	type testGraph = MemoryGraph[int, int, any]
+
 	type args struct {
-		g     Graph[int, int, any]
+		g     *testGraph
 		start int
 		end   int
 	}
@@ -702,7 +704,7 @@ func TestAllPathsBetween(t *testing.T) {
 		{
 			name: "directed",
 			args: args{
-				g: func() Graph[int, int, any] {
+				g: func() *testGraph {
 					g := NewMemoryGraph[int, int, any](IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
@@ -735,7 +737,7 @@ func TestAllPathsBetween(t *testing.T) {
 		{
 			name: "undirected",
 			args: args{
-				g: func() Graph[int, int, any] {
+				g: func() *testGraph {
 					g := NewMemoryGraph[int, int, any](IntHash)
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
@@ -771,7 +773,7 @@ func TestAllPathsBetween(t *testing.T) {
 		{
 			name: "directed with cycle",
 			args: args{
-				g: func() Graph[int, int, any] {
+				g: func() *testGraph {
 					g := NewMemoryGraph[int, int, any](IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
@@ -795,7 +797,7 @@ func TestAllPathsBetween(t *testing.T) {
 		{
 			name: "directed with self cycle",
 			args: args{
-				g: func() Graph[int, int, any] {
+				g: func() *testGraph {
 					g := NewMemoryGraph[int, int, any](IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)
@@ -821,7 +823,7 @@ func TestAllPathsBetween(t *testing.T) {
 		{
 			name: "directed with unuseable cycle",
 			args: args{
-				g: func() Graph[int, int, any] {
+				g: func() *testGraph {
 					g := NewMemoryGraph[int, int, any](IntHash, Directed())
 					for i := 0; i <= 8; i++ {
 						_ = g.AddVertex(i)

@@ -27,10 +27,6 @@ func BulkAddVertices[K comparable, V any, E any](g GraphWrite[K, V, E], vertices
 	return nil
 }
 
-func (d DefaultGraph[K, V, E]) BulkAddVertices(values []V) error {
-	return BulkAddVertices[K, V, E](d, values)
-}
-
 // BulkAddEdges adds multiple edges to the graph at once. If any of the edges
 // already exists, ErrEdgeAlreadyExists will be returned.
 // If supported by the graph, this is an atomic operation, meaning that if any
@@ -44,8 +40,4 @@ func BulkAddEdges[K comparable, V any, E any](g GraphWrite[K, V, E], edges map[K
 		}
 	}
 	return nil
-}
-
-func (d DefaultGraph[K, V, E]) BulkAddEdges(edges map[K][]K) error {
-	return BulkAddEdges[K, V, E](d, edges)
 }

@@ -65,10 +65,6 @@ func PredecessorMap[K comparable, V any, E any](g GraphRead[K, V, E]) (map[K]map
 	return adj, nil
 }
 
-func (d DefaultGraph[K, V, E]) AdjacencyMap() (map[K]map[K]Edge[K, E], error) {
-	return AdjacencyMap(d.g)
-}
-
 func AdjacencyMap[K comparable, V any, E any](g GraphRead[K, V, E]) (map[K]map[K]Edge[K, E], error) {
 	adj := make(map[K]map[K]Edge[K, E])
 	for v, err := range g.Vertices() {
@@ -87,8 +83,4 @@ func AdjacencyMap[K comparable, V any, E any](g GraphRead[K, V, E]) (map[K]map[K
 		adj[e.Source][e.Target] = e
 	}
 	return adj, nil
-}
-
-func (d DefaultGraph[K, V, E]) PredecessorMap() (map[K]map[K]Edge[K, E], error) {
-	return PredecessorMap(d.g)
 }

@@ -1077,7 +1077,7 @@ func edgesAreEqual[K comparable, E any](a, b Edge[K, E], directed bool) bool {
 	return true
 }
 
-func newTestGraph(vertices []int, edges []Edge[int, any]) *memoryGraph[int, int, any] {
+func newTestGraph(vertices []int, edges []Edge[int, any]) *MemoryGraph[int, int, any] {
 	g := NewMemoryGraph[int, int, any](IntHash, Directed())
 
 	for _, vertex := range vertices {

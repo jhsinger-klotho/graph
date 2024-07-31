@@ -108,10 +108,6 @@ func CreatesCycle[K comparable, V any, E any](g interface {
 	return false, nil
 }
 
-func (d DefaultGraph[K, V, E]) CreatesCycle(source, target K) (bool, error) {
-	return CreatesCycle(d, source, target)
-}
-
 type GraphShortestPath[K comparable, V any, E any] interface {
 	// ShortestPath returns a function which computes the shortest path between the given source
 	// and arbitrary target vertices. A default implementation is provided: [ShortestPath]/[ShortestPathStable]
@@ -147,10 +143,6 @@ func ShortestPathStable[K comparable, V any, E any](g interface {
 	GraphRelations[K, E]
 }, source K, less func(a, b K) bool) ShortestPather[K] {
 	return BellmanFordShortestPath(g, source, less)
-}
-
-func (d DefaultGraph[K, V, E]) ShortestPaths(source K, less func(a, b K) bool) ShortestPather[K] {
-	return ShortestPathStable(d, source, less)
 }
 
 type shortestPathResult[K comparable] struct {
@@ -555,8 +547,4 @@ func AllPathsFromAdjacency[K comparable, ET any](adjacencyMap map[K]map[K]ET, st
 			}
 		}
 	}
-}
-
-func (d DefaultGraph[K, V, E]) AllPathsBetween(start, end K) PathIter[K] {
-	return AllPathsBetween(d, start, end)
 }

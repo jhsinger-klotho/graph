@@ -29,10 +29,6 @@ func DownstreamNeighbors[K comparable, V any, E any](g interface {
 	}
 }
 
-func (d DefaultGraph[K, V, E]) DownstreamNeighbors(hash K) EdgeIter[K, E] {
-	return DownstreamNeighbors[K, V, E](d, hash)
-}
-
 // UpstreamNeighbors returns an iterator over the upstream neighbors of the given vertex.
 // Thus, all edges have `.Target == source`.
 func UpstreamNeighbors[K comparable, V any, E any](g interface {
@@ -53,8 +49,4 @@ func UpstreamNeighbors[K comparable, V any, E any](g interface {
 			}
 		}
 	}
-}
-
-func (d DefaultGraph[K, V, E]) UpstreamNeighbors(hash K) EdgeIter[K, E] {
-	return UpstreamNeighbors[K, V, E](d, hash)
 }

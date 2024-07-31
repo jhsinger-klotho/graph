@@ -54,9 +54,11 @@ import (
 	"strings"
 )
 
-// Graph represents a generic graph data structure consisting of vertices of
-// type T identified by a hash of type K.
 type (
+	// Graph represents a generic graph data structure consisting of vertices of
+	// type T identified by a hash of type K.. It's a catchall interface, and making
+	// more specific interfaces (as a combination of the component interfaces)
+	// for your specific use case is recommended.
 	Graph[K comparable, V any, E any] interface {
 		// Read interfaces
 		GraphRead[K, V, E]

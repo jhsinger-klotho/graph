@@ -826,7 +826,7 @@ func TestUndirected_OrderAndSize(t *testing.T) {
 	}
 }
 
-func newUndirectedTestGraph(vertices []int, edges []Edge[int, any]) *memoryGraph[int, int, any] {
+func newUndirectedTestGraph(vertices []int, edges []Edge[int, any]) *MemoryGraph[int, int, any] {
 	g := NewMemoryGraph[int, int, any](IntHash)
 
 	for _, vertex := range vertices {

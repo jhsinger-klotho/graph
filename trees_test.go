@@ -223,7 +223,7 @@ func mapToString(m map[string]map[string]Edge[string, any]) string {
 	return sb.String()
 }
 
-func newStringUndirectedTestGraph(vertices []string, edges []Edge[string, any]) *memoryGraph[string, string, any] {
+func newStringUndirectedTestGraph(vertices []string, edges []Edge[string, any]) *MemoryGraph[string, string, any] {
 	g := NewMemoryGraph[string, string, any](StringHash)
 
 	for _, vertex := range vertices {
